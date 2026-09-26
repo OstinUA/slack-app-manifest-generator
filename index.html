@@ -1,0 +1,1567 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Slack App Manifest Generator</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js"
+          integrity="sha512-CSBhVREyzHAjAFfBlIBakjOf8GRTGW/QFt/0/v1/n0/v3vO1jrkXlJqjjQ5fXIoXSU8z1jxiU9MaC7K7XSWfWg=="
+          crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <style>
+    :root {
+      color-scheme: dark;
+    }
+    html, body {
+      background-color: #0b0d12;
+      color: #e6e8ec;
+      font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    }
+    /* Custom scrollbar for dark mode */
+    ::-webkit-scrollbar { width: 10px; height: 10px; }
+    ::-webkit-scrollbar-track { background: #0b0d12; }
+    ::-webkit-scrollbar-thumb { background: #2a2f3a; border-radius: 6px; }
+    ::-webkit-scrollbar-thumb:hover { background: #3a4150; }
+
+    /* Toggle switch */
+    .toggle {
+      position: relative;
+      width: 40px;
+      height: 22px;
+      background-color: #2a2f3a;
+      border-radius: 9999px;
+      cursor: pointer;
+      transition: background-color 0.2s;
+      flex-shrink: 0;
+    }
+    .toggle::after {
+      content: "";
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 18px;
+      height: 18px;
+      background-color: #fff;
+      border-radius: 9999px;
+      transition: transform 0.2s;
+    }
+    .toggle.is-on { background-color: #4f46e5; }
+    .toggle.is-on::after { transform: translateX(18px); }
+    .toggle:focus-visible { outline: 2px solid #4f46e5; outline-offset: 2px; }
+
+    /* Form controls */
+    .field-input,
+    .field-textarea,
+    .field-select {
+      width: 100%;
+      background-color: #11141b;
+      border: 1px solid #2a2f3a;
+      color: #e6e8ec;
+      border-radius: 6px;
+      padding: 8px 10px;
+      font-size: 14px;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .field-input:focus,
+    .field-textarea:focus,
+    .field-select:focus {
+      outline: none;
+      border-color: #4f46e5;
+      box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.25);
+    }
+    .field-input.is-invalid,
+    .field-textarea.is-invalid,
+    .field-select.is-invalid {
+      border-color: #dc2626;
+    }
+    .field-input[type="color"] {
+      padding: 2px;
+      width: 44px;
+      height: 36px;
+      cursor: pointer;
+    }
+    .field-error {
+      color: #f87171;
+      font-size: 12px;
+      margin-top: 4px;
+      min-height: 14px;
+    }
+    .field-counter {
+      color: #6b7280;
+      font-size: 11px;
+      margin-top: 2px;
+      text-align: right;
+    }
+
+    /* Tag pills */
+    .tag-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background-color: #1c2030;
+      border: 1px solid #2a2f3a;
+      color: #cbd5e1;
+      border-radius: 9999px;
+      padding: 4px 10px;
+      font-size: 12px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+    .tag-pill-remove {
+      background: transparent;
+      border: none;
+      color: #94a3b8;
+      cursor: pointer;
+      font-size: 14px;
+      line-height: 1;
+      padding: 0 2px;
+    }
+    .tag-pill-remove:hover { color: #f87171; }
+
+    /* Section card */
+    .section-card {
+      background-color: #11141b;
+      border: 1px solid #1f2330;
+      border-radius: 10px;
+      padding: 20px;
+    }
+    .section-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #e6e8ec;
+      letter-spacing: 0.02em;
+    }
+    .section-subtitle {
+      font-size: 12px;
+      color: #6b7280;
+      margin-top: 2px;
+    }
+
+    /* Buttons */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      font-size: 13px;
+      font-weight: 500;
+      padding: 7px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background-color 0.15s, border-color 0.15s;
+      border: 1px solid transparent;
+    }
+    .btn-primary {
+      background-color: #4f46e5;
+      color: #fff;
+    }
+    .btn-primary:hover { background-color: #4338ca; }
+    .btn-secondary {
+      background-color: #1c2030;
+      color: #cbd5e1;
+      border-color: #2a2f3a;
+    }
+    .btn-secondary:hover { background-color: #232838; }
+    .btn-danger-ghost {
+      background-color: transparent;
+      color: #f87171;
+      border-color: #3a1f23;
+    }
+    .btn-danger-ghost:hover { background-color: #2a1518; }
+
+    /* Output panel */
+    .output-pre {
+      background-color: #0b0d12;
+      color: #e6e8ec;
+      padding: 16px;
+      border-radius: 8px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 12.5px;
+      line-height: 1.55;
+      white-space: pre;
+      overflow-x: auto;
+      max-height: calc(100vh - 220px);
+      overflow-y: auto;
+    }
+    .yaml-key { color: #93c5fd; }
+    .yaml-string { color: #86efac; }
+    .yaml-bool, .yaml-number { color: #fbbf24; }
+    .yaml-null { color: #94a3b8; }
+    .yaml-dash { color: #a78bfa; }
+    .yaml-comment { color: #6b7280; font-style: italic; }
+
+    /* Modal */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background-color: rgba(0, 0, 0, 0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 50;
+      padding: 16px;
+    }
+    .modal-card {
+      background-color: #11141b;
+      border: 1px solid #2a2f3a;
+      border-radius: 10px;
+      width: 100%;
+      max-width: 720px;
+      padding: 20px;
+    }
+
+    /* Copied badge */
+    .copied-badge {
+      position: absolute;
+      top: -28px;
+      right: 0;
+      background-color: #16a34a;
+      color: #fff;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 3px 8px;
+      border-radius: 9999px;
+      opacity: 0;
+      transition: opacity 0.2s;
+      pointer-events: none;
+    }
+    .copied-badge.is-visible { opacity: 1; }
+
+    /* Banner */
+    .banner-error {
+      background-color: #2a1518;
+      border: 1px solid #5a2025;
+      color: #fca5a5;
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+    }
+
+    /* Inline icon */
+    .icon { width: 16px; height: 16px; }
+
+    /* Sticky right column */
+    @media (min-width: 1024px) {
+      .output-sticky {
+        position: sticky;
+        top: 24px;
+        align-self: flex-start;
+      }
+    }
+  </style>
+</head>
+<body class="min-h-screen">
+  <header class="border-b border-[#1f2330] bg-[#0b0d12]">
+    <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+      <div>
+        <h1 class="text-lg font-semibold tracking-tight">Slack App Manifest Generator</h1>
+        <p class="text-xs text-gray-500 mt-0.5">Build a schema-compliant manifest YAML in real time.</p>
+      </div>
+      <div class="flex items-center gap-2">
+        <button id="btn-import" type="button" class="btn btn-secondary" title="Import existing YAML manifest">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+          Import YAML
+        </button>
+        <button id="btn-reset" type="button" class="btn btn-secondary" title="Clear localStorage and restore defaults">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>
+          Reset to Defaults
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-6 py-6">
+    <div id="library-warning" class="hidden mb-4"></div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <!-- LEFT COLUMN: FORM -->
+      <div class="space-y-5" id="form-column">
+
+        <!-- Section 1: Basic Information -->
+        <section class="section-card">
+          <div class="mb-4">
+            <h2 class="section-title">Basic Information</h2>
+            <p class="section-subtitle">Display details shown in the Slack App directory.</p>
+          </div>
+          <div class="space-y-4">
+            <div>
+              <label for="input-app-name" class="block text-xs font-medium text-gray-300 mb-1">App Name <span class="text-red-400">*</span></label>
+              <input id="input-app-name" type="text" maxlength="35" class="field-input" placeholder="My Slack App" />
+              <div class="flex justify-between">
+                <div class="field-error" id="error-app-name"></div>
+                <div class="field-counter"><span id="counter-app-name">0</span> / 35</div>
+              </div>
+            </div>
+            <div>
+              <label for="input-short-desc" class="block text-xs font-medium text-gray-300 mb-1">Short Description</label>
+              <input id="input-short-desc" type="text" maxlength="140" class="field-input" placeholder="A brief description of your app." />
+              <div class="flex justify-between">
+                <div class="field-error" id="error-short-desc"></div>
+                <div class="field-counter"><span id="counter-short-desc">0</span> / 140</div>
+              </div>
+            </div>
+            <div>
+              <label for="input-long-desc" class="block text-xs font-medium text-gray-300 mb-1">Long Description</label>
+              <textarea id="input-long-desc" rows="3" class="field-textarea" placeholder="Optional. A longer description shown on the app detail page."></textarea>
+              <div class="field-error" id="error-long-desc"></div>
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-300 mb-1">Background Color</label>
+              <div class="flex items-center gap-2">
+                <input id="input-bg-color-picker" type="color" class="field-input" />
+                <input id="input-bg-color-hex" type="text" class="field-input font-mono" placeholder="#2C2D30" />
+              </div>
+              <div class="field-error" id="error-bg-color"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Section 2: Features & Settings -->
+        <section class="section-card">
+          <div class="mb-4">
+            <h2 class="section-title">Features &amp; Settings</h2>
+            <p class="section-subtitle">Top-level toggles for app behavior.</p>
+          </div>
+          <div class="space-y-3" id="toggles-container"></div>
+        </section>
+
+        <!-- Section 3: OAuth Scopes -->
+        <section class="section-card">
+          <div class="mb-4">
+            <h2 class="section-title">OAuth Scopes</h2>
+            <p class="section-subtitle">Permissions requested by the bot and user tokens.</p>
+          </div>
+          <div class="space-y-5">
+            <div>
+              <label class="block text-xs font-medium text-gray-300 mb-2">Bot Token Scopes</label>
+              <div id="bot-scopes-tags" class="flex flex-wrap gap-2 mb-2 min-h-[24px]"></div>
+              <div class="flex gap-2">
+                <input id="input-bot-scope" type="text" class="field-input font-mono" placeholder="e.g. channels:read" />
+                <button id="btn-add-bot-scope" type="button" class="btn btn-secondary">Add</button>
+              </div>
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-300 mb-2">User Token Scopes</label>
+              <div id="user-scopes-tags" class="flex flex-wrap gap-2 mb-2 min-h-[24px]"></div>
+              <div class="flex gap-2">
+                <input id="input-user-scope" type="text" class="field-input font-mono" placeholder="e.g. identity.basic" />
+                <button id="btn-add-user-scope" type="button" class="btn btn-secondary">Add</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Section 4: Slash Commands -->
+        <section class="section-card">
+          <div class="mb-4 flex items-start justify-between gap-4">
+            <div>
+              <h2 class="section-title">Slash Commands</h2>
+              <p class="section-subtitle">Commands users can invoke with a leading slash.</p>
+            </div>
+            <button id="btn-add-command" type="button" class="btn btn-secondary">Add Command</button>
+          </div>
+          <div id="commands-container" class="space-y-3"></div>
+        </section>
+
+        <!-- Section 5: Event Subscriptions -->
+        <section class="section-card">
+          <div class="mb-4">
+            <h2 class="section-title">Event Subscriptions</h2>
+            <p class="section-subtitle">Slack delivers events to your request URL.</p>
+          </div>
+          <div class="space-y-4">
+            <div>
+              <label for="input-event-url" class="block text-xs font-medium text-gray-300 mb-1">Request URL</label>
+              <input id="input-event-url" type="text" class="field-input font-mono" placeholder="https://example.com/slack/events" />
+              <div class="field-error" id="error-event-url"></div>
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-300 mb-2">Bot Events</label>
+              <div id="bot-events-tags" class="flex flex-wrap gap-2 mb-2 min-h-[24px]"></div>
+              <div class="flex gap-2">
+                <input id="input-bot-event" type="text" class="field-input font-mono" placeholder="e.g. app_mention" />
+                <button id="btn-add-bot-event" type="button" class="btn btn-secondary">Add</button>
+              </div>
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-300 mb-2">User Events</label>
+              <div id="user-events-tags" class="flex flex-wrap gap-2 mb-2 min-h-[24px]"></div>
+              <div class="flex gap-2">
+                <input id="input-user-event" type="text" class="field-input font-mono" placeholder="e.g. message.im" />
+                <button id="btn-add-user-event" type="button" class="btn btn-secondary">Add</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Section 6: Shortcuts -->
+        <section class="section-card">
+          <div class="mb-4 flex items-start justify-between gap-4">
+            <div>
+              <h2 class="section-title">Shortcuts</h2>
+              <p class="section-subtitle">Global or message shortcuts triggered from Slack UI.</p>
+            </div>
+            <button id="btn-add-shortcut" type="button" class="btn btn-secondary">Add Shortcut</button>
+          </div>
+          <div id="shortcuts-container" class="space-y-3"></div>
+        </section>
+
+        <!-- Section 7: Interactivity -->
+        <section class="section-card">
+          <div class="mb-4">
+            <h2 class="section-title">Interactivity</h2>
+            <p class="section-subtitle">Handle interactive component payloads.</p>
+          </div>
+          <div class="space-y-4" id="interactivity-container"></div>
+        </section>
+
+      </div>
+
+      <!-- RIGHT COLUMN: OUTPUT -->
+      <div class="output-sticky">
+        <div class="section-card">
+          <div class="flex items-center justify-between mb-3">
+            <div>
+              <h2 class="section-title">Generated YAML</h2>
+              <p class="section-subtitle">Updates live as you edit.</p>
+            </div>
+            <div class="relative flex items-center gap-2">
+              <span id="copied-badge" class="copied-badge">Copied</span>
+              <button id="btn-copy" type="button" class="btn btn-secondary" title="Copy YAML to clipboard">
+                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                Copy to Clipboard
+              </button>
+              <button id="btn-download" type="button" class="btn btn-primary" title="Download manifest.yaml">
+                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                Download manifest.yaml
+              </button>
+            </div>
+          </div>
+          <div id="output-error" class="hidden mb-3"></div>
+          <pre class="output-pre"><code id="output-code"></code></pre>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Import Modal (hidden by default) -->
+  <div id="import-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="import-modal-title">
+    <div class="modal-card">
+      <div class="flex items-center justify-between mb-3">
+        <h3 id="import-modal-title" class="section-title">Import Manifest YAML</h3>
+        <button id="btn-import-close" type="button" class="btn btn-secondary" title="Close">Close</button>
+      </div>
+      <p class="section-subtitle mb-3">Paste an existing Slack manifest YAML. Confirming will replace your current form state.</p>
+      <textarea id="import-textarea" rows="14" class="field-textarea font-mono" placeholder="_metadata:&#10;  major_version: 1&#10;  minor_version: 1&#10;display_information:&#10;  name: ..."></textarea>
+      <div id="import-error" class="field-error mt-2"></div>
+      <div class="flex justify-end gap-2 mt-4">
+        <button id="btn-import-cancel" type="button" class="btn btn-secondary">Cancel</button>
+        <button id="btn-import-confirm" type="button" class="btn btn-primary">Import</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    "use strict";
+
+    /* =========================================================================
+     * CONSTANTS — User-facing strings & configuration
+     * ========================================================================= */
+    const STRINGS = Object.freeze({
+      LIBRARY_ERROR: "The js-yaml library failed to load. YAML output is disabled — showing JSON as a fallback so you don't lose your work.",
+      YAML_DUMP_ERROR: "Failed to serialize YAML: ",
+      IMPORT_EMPTY: "Please paste a YAML document.",
+      IMPORT_PARSE_ERROR: "Could not parse YAML: ",
+      IMPORT_INVALID_STRUCTURE: "The document is not a valid Slack manifest object.",
+      IMPORT_SUCCESS: "Imported successfully.",
+      COPY_LABEL: "Copy to Clipboard",
+      COPY_SUCCESS: "Copied",
+      ERR_REQUIRED: "This field is required.",
+      ERR_HEX: "Must be a valid hex color, e.g. #2C2D30.",
+      ERR_COMMAND_SLASH: "Command must start with \"/\".",
+      ERR_HTTPS: "URL must start with https:// and be valid.",
+      ERR_CALLBACK_ID: "Callback ID must contain only letters, numbers, and underscores.",
+      RESET_CONFIRM: "Reset the form to defaults? This will clear all your input."
+    });
+
+    const STORAGE_KEY = "slack-manifest-generator-state-v1";
+    const DEBOUNCE_MS = 80;
+
+    const DEFAULT_BG_COLOR = "#2C2D30";
+    const DEFAULT_BOT_SCOPES = ["commands", "chat:write"];
+
+    const HEX_COLOR_RE = /^#([0-9a-fA-F]{6})$/;
+    const HTTPS_URL_RE = /^https:\/\/[^\s]+$/i;
+    const CALLBACK_ID_RE = /^[A-Za-z0-9_]+$/;
+
+    /** Feature toggles — declared as data so they render uniformly. */
+    const TOGGLE_DEFS = Object.freeze([
+      { key: "socketMode",         label: "Enable Socket Mode",         description: "Connect via WebSocket instead of public HTTPS endpoints." },
+      { key: "orgDeploy",           label: "Enable Org Deploy",          description: "Allow installation across an entire org." },
+      { key: "tokenRotation",       label: "Enable Token Rotation",      description: "Use refreshable, short-lived bot tokens." },
+      { key: "incomingWebhooks",    label: "Enable Incoming Webhooks",   description: "Add the incoming-webhook scope and feature." },
+      { key: "messagesTabEnabled",  label: "Messages Tab Enabled",       description: "Show the Messages tab in App Home." },
+      { key: "messagesTabReadOnly", label: "Messages Tab Read-Only",     description: "Make the Messages tab read-only." }
+    ]);
+
+    /* =========================================================================
+     * STATE
+     * ========================================================================= */
+    /** @type {object} Single source of truth — all reads/writes go through here. */
+    let state = initState();
+
+    /** Debounce handle for text-input renders. */
+    let renderDebounce = null;
+
+    /**
+     * Build the initial default state. Used at first load and on Reset.
+     * @returns {object}
+     */
+    function initState() {
+      return {
+        appName: "",
+        shortDescription: "",
+        longDescription: "",
+        backgroundColor: DEFAULT_BG_COLOR,
+        toggles: {
+          socketMode: false,
+          orgDeploy: false,
+          tokenRotation: false,
+          incomingWebhooks: false,
+          messagesTabEnabled: false,
+          messagesTabReadOnly: false
+        },
+        botScopes: [...DEFAULT_BOT_SCOPES],
+        userScopes: [],
+        slashCommands: [],
+        eventSubscriptions: {
+          requestUrl: "",
+          botEvents: [],
+          userEvents: []
+        },
+        shortcuts: [],
+        interactivity: {
+          enabled: false,
+          requestUrl: "",
+          messageMenuOptionsUrl: ""
+        }
+      };
+    }
+
+    /* =========================================================================
+     * PERSISTENCE
+     * ========================================================================= */
+    /** Persist current state to localStorage. */
+    function saveState() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      } catch (err) {
+        /* localStorage may be unavailable in private mode — ignore. */
+      }
+    }
+
+    /** Restore state from localStorage if present and valid. */
+    function loadState() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return;
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === "object") {
+          state = mergeWithDefaults(parsed);
+        }
+      } catch (err) {
+        /* Corrupt storage — ignore and keep defaults. */
+      }
+    }
+
+    /**
+     * Deep-merge persisted state on top of a fresh defaults object, so that
+     * adding new fields to defaults in future versions still works.
+     */
+    function mergeWithDefaults(persisted) {
+      const defaults = initState();
+      return {
+        appName:             typeof persisted.appName === "string" ? persisted.appName : defaults.appName,
+        shortDescription:    typeof persisted.shortDescription === "string" ? persisted.shortDescription : defaults.shortDescription,
+        longDescription:     typeof persisted.longDescription === "string" ? persisted.longDescription : defaults.longDescription,
+        backgroundColor:     typeof persisted.backgroundColor === "string" ? persisted.backgroundColor : defaults.backgroundColor,
+        toggles:             Object.assign({}, defaults.toggles, persisted.toggles || {}),
+        botScopes:           Array.isArray(persisted.botScopes) ? persisted.botScopes.slice() : defaults.botScopes,
+        userScopes:          Array.isArray(persisted.userScopes) ? persisted.userScopes.slice() : defaults.userScopes,
+        slashCommands:       Array.isArray(persisted.slashCommands) ? persisted.slashCommands.map(normalizeCommand) : defaults.slashCommands,
+        eventSubscriptions:  Object.assign({}, defaults.eventSubscriptions, persisted.eventSubscriptions || {}, {
+          botEvents: Array.isArray(persisted.eventSubscriptions && persisted.eventSubscriptions.botEvents) ? persisted.eventSubscriptions.botEvents.slice() : [],
+          userEvents: Array.isArray(persisted.eventSubscriptions && persisted.eventSubscriptions.userEvents) ? persisted.eventSubscriptions.userEvents.slice() : []
+        }),
+        shortcuts:           Array.isArray(persisted.shortcuts) ? persisted.shortcuts.map(normalizeShortcut) : defaults.shortcuts,
+        interactivity:       Object.assign({}, defaults.interactivity, persisted.interactivity || {})
+      };
+    }
+
+    function normalizeCommand(c) {
+      return {
+        command: typeof c.command === "string" ? c.command : "",
+        description: typeof c.description === "string" ? c.description : "",
+        usageHint: typeof c.usageHint === "string" ? c.usageHint : "",
+        shouldEscape: Boolean(c.shouldEscape)
+      };
+    }
+
+    function normalizeShortcut(s) {
+      return {
+        name: typeof s.name === "string" ? s.name : "",
+        callbackId: typeof s.callbackId === "string" ? s.callbackId : "",
+        description: typeof s.description === "string" ? s.description : "",
+        type: s.type === "message" ? "message" : "global"
+      };
+    }
+
+    /* =========================================================================
+     * STATE UPDATE — central mutator
+     * ========================================================================= */
+    /**
+     * Mutate state at the given dotted path and trigger persistence + render.
+     * @param {string} path  e.g. "toggles.socketMode" or "eventSubscriptions.requestUrl"
+     * @param {*}      value
+     * @param {object} [options]
+     * @param {boolean} [options.debounce] Whether to debounce the render.
+     */
+    function updateState(path, value, options) {
+      const parts = path.split(".");
+      let target = state;
+      for (let i = 0; i < parts.length - 1; i++) {
+        target = target[parts[i]];
+      }
+      target[parts[parts.length - 1]] = value;
+      saveState();
+
+      if (options && options.debounce) {
+        if (renderDebounce !== null) clearTimeout(renderDebounce);
+        renderDebounce = setTimeout(() => {
+          renderDebounce = null;
+          renderYAML();
+        }, DEBOUNCE_MS);
+      } else {
+        renderYAML();
+      }
+    }
+
+    /* =========================================================================
+     * MANIFEST BUILDER
+     * ========================================================================= */
+    /**
+     * Convert the internal state into the exact object structure that
+     * Slack's manifest schema expects. Omits any empty or false-optional values.
+     * @returns {object}
+     */
+    function buildManifestObject() {
+      const manifest = {
+        _metadata: { major_version: 1, minor_version: 1 },
+        display_information: {
+          name: state.appName || "",
+          description: state.shortDescription || "",
+          background_color: HEX_COLOR_RE.test(state.backgroundColor) ? state.backgroundColor : DEFAULT_BG_COLOR
+        }
+      };
+
+      if (state.longDescription && state.longDescription.trim().length > 0) {
+        manifest.display_information.long_description = state.longDescription;
+      }
+
+      // features
+      const features = {
+        app_home: {
+          messages_tab_enabled: Boolean(state.toggles.messagesTabEnabled),
+          messages_tab_read_only_enabled: Boolean(state.toggles.messagesTabReadOnly)
+        }
+      };
+
+      const validCommands = state.slashCommands.filter(c => c.command && c.description);
+      if (validCommands.length > 0) {
+        features.slash_commands = validCommands.map(c => {
+          const entry = {
+            command: c.command,
+            description: c.description,
+            should_escape: Boolean(c.shouldEscape)
+          };
+          if (c.usageHint && c.usageHint.length > 0) {
+            entry.usage_hint = c.usageHint;
+          }
+          return entry;
+        });
+      }
+
+      const validShortcuts = state.shortcuts.filter(s => s.name && s.callbackId && s.description);
+      if (validShortcuts.length > 0) {
+        features.shortcuts = validShortcuts.map(s => ({
+          name: s.name,
+          callback_id: s.callbackId,
+          description: s.description,
+          type: s.type === "message" ? "message" : "global"
+        }));
+      }
+
+      if (state.toggles.incomingWebhooks) {
+        features.incoming_webhooks = true;
+      }
+
+      manifest.features = features;
+
+      // oauth_config
+      const oauthScopes = {};
+      const effectiveBotScopes = state.toggles.incomingWebhooks
+        ? Array.from(new Set([...state.botScopes, "incoming-webhook"]))
+        : state.botScopes.slice();
+
+      if (effectiveBotScopes.length > 0) oauthScopes.bot = effectiveBotScopes;
+      if (state.userScopes.length > 0)   oauthScopes.user = state.userScopes;
+
+      const oauthConfig = {};
+      if (Object.keys(oauthScopes).length > 0) oauthConfig.scopes = oauthScopes;
+      manifest.oauth_config = oauthConfig;
+
+      // settings
+      const settings = {};
+
+      const hasEventUrl = HTTPS_URL_RE.test(state.eventSubscriptions.requestUrl);
+      const hasBotEvents = state.eventSubscriptions.botEvents.length > 0;
+      const hasUserEvents = state.eventSubscriptions.userEvents.length > 0;
+      if (hasEventUrl || hasBotEvents || hasUserEvents) {
+        const eventBlock = {};
+        if (hasEventUrl) eventBlock.request_url = state.eventSubscriptions.requestUrl;
+        if (hasBotEvents) eventBlock.bot_events = state.eventSubscriptions.botEvents.slice();
+        if (hasUserEvents) eventBlock.user_events = state.eventSubscriptions.userEvents.slice();
+        settings.event_subscriptions = eventBlock;
+      }
+
+      if (state.interactivity.enabled) {
+        const interactivityBlock = { is_enabled: true };
+        if (HTTPS_URL_RE.test(state.interactivity.requestUrl)) {
+          interactivityBlock.request_url = state.interactivity.requestUrl;
+        }
+        if (state.interactivity.messageMenuOptionsUrl &&
+            HTTPS_URL_RE.test(state.interactivity.messageMenuOptionsUrl)) {
+          interactivityBlock.message_menu_options_url = state.interactivity.messageMenuOptionsUrl;
+        }
+        settings.interactivity = interactivityBlock;
+      }
+
+      settings.org_deploy_enabled = Boolean(state.toggles.orgDeploy);
+      settings.socket_mode_enabled = Boolean(state.toggles.socketMode);
+      settings.token_rotation_enabled = Boolean(state.toggles.tokenRotation);
+
+      manifest.settings = settings;
+
+      return manifest;
+    }
+
+    /* =========================================================================
+     * YAML RENDER
+     * ========================================================================= */
+    const outputCodeEl = () => document.getElementById("output-code");
+    const outputErrorEl = () => document.getElementById("output-error");
+
+    /**
+     * Build the manifest object, serialize to YAML, and write the highlighted
+     * result into the output panel. Falls back to JSON on any error.
+     */
+    function renderYAML() {
+      const manifest = buildManifestObject();
+      const errEl = outputErrorEl();
+      errEl.classList.add("hidden");
+      errEl.textContent = "";
+
+      if (typeof window.jsyaml === "undefined" || !window.jsyaml || typeof window.jsyaml.dump !== "function") {
+        // Library failed — fallback to JSON.
+        outputCodeEl().textContent = JSON.stringify(manifest, null, 2);
+        return;
+      }
+
+      let yamlString;
+      try {
+        yamlString = window.jsyaml.dump(manifest, {
+          noRefs: true,
+          lineWidth: 120,
+          quotingType: '"',
+          forceQuotes: false
+        });
+      } catch (err) {
+        errEl.textContent = STRINGS.YAML_DUMP_ERROR + (err && err.message ? err.message : String(err));
+        errEl.className = "banner-error mb-3";
+        outputCodeEl().textContent = JSON.stringify(manifest, null, 2);
+        return;
+      }
+
+      outputCodeEl().innerHTML = highlightYAML(yamlString);
+    }
+
+    /**
+     * A small, regex-driven YAML highlighter. Only colors keys, strings,
+     * booleans/numbers, and the list-item dash — keeps the implementation
+     * dependency-free.
+     */
+    function highlightYAML(yamlString) {
+      const escape = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      const lines = yamlString.split("\n");
+      return lines.map((rawLine) => {
+        let line = escape(rawLine);
+
+        // Comment
+        const hashIdx = line.indexOf("#");
+        let commentPart = "";
+        if (hashIdx >= 0) {
+          // Only treat as comment if # is preceded by whitespace or start of line.
+          const before = line.slice(0, hashIdx);
+          if (/^\s*$/.test(before) || /\s$/.test(before)) {
+            commentPart = '<span class="yaml-comment">' + line.slice(hashIdx) + '</span>';
+            line = before;
+          }
+        }
+
+        // List dash
+        line = line.replace(/^(\s*)(-)(\s)/, '$1<span class="yaml-dash">$2</span>$3');
+
+        // Key: value pattern
+        line = line.replace(/^(\s*)([A-Za-z_][\w\-]*)(:)(\s*)(.*)$/, function (m, indent, key, colon, sp, rest) {
+          let valueHTML = rest;
+          if (rest.length > 0) {
+            if (/^(true|false)$/.test(rest)) {
+              valueHTML = '<span class="yaml-bool">' + rest + '</span>';
+            } else if (/^-?\d+(\.\d+)?$/.test(rest)) {
+              valueHTML = '<span class="yaml-number">' + rest + '</span>';
+            } else if (/^null$/.test(rest)) {
+              valueHTML = '<span class="yaml-null">' + rest + '</span>';
+            } else {
+              valueHTML = '<span class="yaml-string">' + rest + '</span>';
+            }
+          }
+          return indent + '<span class="yaml-key">' + key + '</span>' + colon + sp + valueHTML;
+        });
+
+        return line + commentPart;
+      }).join("\n");
+    }
+
+    /* =========================================================================
+     * RENDER FORM — push state into DOM (used on load, reset, import)
+     * ========================================================================= */
+    /** Push the entire state into the form DOM. Called only when state is replaced wholesale. */
+    function renderForm() {
+      // Basic info
+      document.getElementById("input-app-name").value = state.appName;
+      document.getElementById("input-short-desc").value = state.shortDescription;
+      document.getElementById("input-long-desc").value = state.longDescription;
+      document.getElementById("input-bg-color-picker").value = HEX_COLOR_RE.test(state.backgroundColor) ? state.backgroundColor : DEFAULT_BG_COLOR;
+      document.getElementById("input-bg-color-hex").value = state.backgroundColor;
+      updateCharCounter("input-app-name", "counter-app-name");
+      updateCharCounter("input-short-desc", "counter-short-desc");
+
+      // Toggles
+      renderToggles();
+
+      // Tag inputs
+      renderTags("bot-scopes-tags", state.botScopes, (idx) => {
+        state.botScopes.splice(idx, 1);
+        updateState("botScopes", state.botScopes);
+        renderTags("bot-scopes-tags", state.botScopes, arguments.callee);
+      });
+      renderScopeTags();
+      renderEventTags();
+
+      // Dynamic lists
+      renderSlashCommands();
+      renderShortcuts();
+
+      // Event subscriptions text input
+      document.getElementById("input-event-url").value = state.eventSubscriptions.requestUrl;
+
+      // Interactivity
+      renderInteractivity();
+    }
+
+    function updateCharCounter(inputId, counterId) {
+      const input = document.getElementById(inputId);
+      const counter = document.getElementById(counterId);
+      if (input && counter) counter.textContent = String(input.value.length);
+    }
+
+    /* ---------- Toggles ---------- */
+    function renderToggles() {
+      const container = document.getElementById("toggles-container");
+      container.innerHTML = "";
+      TOGGLE_DEFS.forEach(def => {
+        const row = document.createElement("div");
+        row.className = "flex items-center justify-between gap-4";
+        row.innerHTML = `
+          <div>
+            <div class="text-sm text-gray-200">${escapeHTML(def.label)}</div>
+            <div class="text-xs text-gray-500">${escapeHTML(def.description)}</div>
+          </div>
+          <button type="button" class="toggle ${state.toggles[def.key] ? "is-on" : ""}" data-toggle-key="${def.key}" aria-pressed="${state.toggles[def.key]}"></button>
+        `;
+        container.appendChild(row);
+      });
+      container.querySelectorAll("[data-toggle-key]").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const key = btn.getAttribute("data-toggle-key");
+          const next = !state.toggles[key];
+          updateState("toggles." + key, next);
+          btn.classList.toggle("is-on", next);
+          btn.setAttribute("aria-pressed", String(next));
+          // If incomingWebhooks toggled, scope list changes too — re-render scope tags.
+          if (key === "incomingWebhooks") renderScopeTags();
+        });
+      });
+    }
+
+    /* ---------- Tags (generic) ---------- */
+    function renderTags(containerId, items, onRemove) {
+      const container = document.getElementById(containerId);
+      container.innerHTML = "";
+      if (items.length === 0) {
+        const empty = document.createElement("div");
+        empty.className = "text-xs text-gray-600 italic";
+        empty.textContent = "No entries yet.";
+        container.appendChild(empty);
+        return;
+      }
+      items.forEach((value, idx) => {
+        const pill = document.createElement("span");
+        pill.className = "tag-pill";
+        pill.innerHTML = `<span>${escapeHTML(value)}</span><button type="button" class="tag-pill-remove" aria-label="Remove ${escapeHTML(value)}">x</button>`;
+        pill.querySelector("button").addEventListener("click", () => onRemove(idx));
+        container.appendChild(pill);
+      });
+    }
+
+    function renderScopeTags() {
+      renderTags("bot-scopes-tags", state.botScopes, (idx) => {
+        state.botScopes.splice(idx, 1);
+        updateState("botScopes", state.botScopes);
+        renderScopeTags();
+      });
+      renderTags("user-scopes-tags", state.userScopes, (idx) => {
+        state.userScopes.splice(idx, 1);
+        updateState("userScopes", state.userScopes);
+        renderScopeTags();
+      });
+    }
+
+    function renderEventTags() {
+      renderTags("bot-events-tags", state.eventSubscriptions.botEvents, (idx) => {
+        state.eventSubscriptions.botEvents.splice(idx, 1);
+        updateState("eventSubscriptions.botEvents", state.eventSubscriptions.botEvents);
+        renderEventTags();
+      });
+      renderTags("user-events-tags", state.eventSubscriptions.userEvents, (idx) => {
+        state.eventSubscriptions.userEvents.splice(idx, 1);
+        updateState("eventSubscriptions.userEvents", state.eventSubscriptions.userEvents);
+        renderEventTags();
+      });
+    }
+
+    function addTag(inputId, listKeyPath, listRef, renderFn) {
+      const inputEl = document.getElementById(inputId);
+      const value = (inputEl.value || "").trim();
+      if (!value) return;
+      if (listRef.indexOf(value) !== -1) {
+        inputEl.value = "";
+        return;
+      }
+      listRef.push(value);
+      updateState(listKeyPath, listRef);
+      inputEl.value = "";
+      renderFn();
+    }
+
+    /* ---------- Slash Commands ---------- */
+    function renderSlashCommands() {
+      const container = document.getElementById("commands-container");
+      container.innerHTML = "";
+      if (state.slashCommands.length === 0) {
+        const empty = document.createElement("div");
+        empty.className = "text-xs text-gray-600 italic";
+        empty.textContent = "No commands defined. Click Add Command to create one.";
+        container.appendChild(empty);
+        return;
+      }
+      state.slashCommands.forEach((cmd, idx) => {
+        const block = document.createElement("div");
+        block.className = "border border-[#2a2f3a] rounded-md p-3 bg-[#0d1018]";
+        block.innerHTML = `
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-medium text-gray-300 mb-1">Command</label>
+              <input type="text" class="field-input font-mono" data-cmd-field="command" data-idx="${idx}" placeholder="/example" />
+              <div class="field-error" data-error-for="command-${idx}"></div>
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-300 mb-1">Description</label>
+              <input type="text" class="field-input" data-cmd-field="description" data-idx="${idx}" placeholder="What it does" />
+              <div class="field-error" data-error-for="cmd-desc-${idx}"></div>
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-300 mb-1">Usage Hint</label>
+              <input type="text" class="field-input font-mono" data-cmd-field="usageHint" data-idx="${idx}" placeholder="[username]" />
+            </div>
+            <div class="flex items-end gap-3">
+              <label class="inline-flex items-center gap-2 text-xs text-gray-300">
+                <input type="checkbox" data-cmd-field="shouldEscape" data-idx="${idx}" class="accent-indigo-500" />
+                Should Escape
+              </label>
+              <button type="button" class="btn btn-danger-ghost ml-auto" data-cmd-remove="${idx}">Remove</button>
+            </div>
+          </div>
+        `;
+        block.querySelector(`[data-cmd-field="command"]`).value = cmd.command;
+        block.querySelector(`[data-cmd-field="description"]`).value = cmd.description;
+        block.querySelector(`[data-cmd-field="usageHint"]`).value = cmd.usageHint;
+        block.querySelector(`[data-cmd-field="shouldEscape"]`).checked = cmd.shouldEscape;
+        container.appendChild(block);
+      });
+
+      container.querySelectorAll("[data-cmd-field]").forEach(el => {
+        el.addEventListener("input", onCommandFieldChange);
+        if (el.type === "text") el.addEventListener("blur", onCommandFieldBlur);
+      });
+      container.querySelectorAll("[data-cmd-remove]").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const idx = Number(btn.getAttribute("data-cmd-remove"));
+          state.slashCommands.splice(idx, 1);
+          updateState("slashCommands", state.slashCommands);
+          renderSlashCommands();
+        });
+      });
+    }
+
+    function onCommandFieldChange(ev) {
+      const idx = Number(ev.target.getAttribute("data-idx"));
+      const field = ev.target.getAttribute("data-cmd-field");
+      const value = field === "shouldEscape" ? ev.target.checked : ev.target.value;
+      state.slashCommands[idx][field] = value;
+      updateState("slashCommands", state.slashCommands, { debounce: field !== "shouldEscape" });
+    }
+
+    function onCommandFieldBlur(ev) {
+      const idx = Number(ev.target.getAttribute("data-idx"));
+      const field = ev.target.getAttribute("data-cmd-field");
+      const cmd = state.slashCommands[idx];
+      if (field === "command") {
+        const errEl = ev.target.parentElement.querySelector(".field-error");
+        if (cmd.command && !cmd.command.startsWith("/")) {
+          ev.target.classList.add("is-invalid");
+          errEl.textContent = STRINGS.ERR_COMMAND_SLASH;
+        } else {
+          ev.target.classList.remove("is-invalid");
+          errEl.textContent = "";
+        }
+      } else if (field === "description") {
+        const errEl = ev.target.parentElement.querySelector(".field-error");
+        if (!cmd.description) {
+          ev.target.classList.add("is-invalid");
+          errEl.textContent = STRINGS.ERR_REQUIRED;
+        } else {
+          ev.target.classList.remove("is-invalid");
+          errEl.textContent = "";
+        }
+      }
+    }
+
+    /* ---------- Shortcuts ---------- */
+    function renderShortcuts() {
+      const container = document.getElementById("shortcuts-container");
+      container.innerHTML = "";
+      if (state.shortcuts.length === 0) {
+        const empty = document.createElement("div");
+        empty.className = "text-xs text-gray-600 italic";
+        empty.textContent = "No shortcuts defined. Click Add Shortcut to create one.";
+        container.appendChild(empty);
+        return;
+      }
+      state.shortcuts.forEach((sc, idx) => {
+        const block = document.createElement("div");
+        block.className = "border border-[#2a2f3a] rounded-md p-3 bg-[#0d1018]";
+        block.innerHTML = `
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-medium text-gray-300 mb-1">Name</label>
+              <input type="text" class="field-input" data-sc-field="name" data-idx="${idx}" placeholder="Open dialog" />
+              <div class="field-error"></div>
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-300 mb-1">Callback ID</label>
+              <input type="text" class="field-input font-mono" data-sc-field="callbackId" data-idx="${idx}" placeholder="open_dialog" />
+              <div class="field-error"></div>
+            </div>
+            <div class="md:col-span-2">
+              <label class="block text-xs font-medium text-gray-300 mb-1">Description</label>
+              <input type="text" class="field-input" data-sc-field="description" data-idx="${idx}" placeholder="What this shortcut does" />
+              <div class="field-error"></div>
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-300 mb-1">Type</label>
+              <select class="field-select" data-sc-field="type" data-idx="${idx}">
+                <option value="global">global</option>
+                <option value="message">message</option>
+              </select>
+            </div>
+            <div class="flex items-end">
+              <button type="button" class="btn btn-danger-ghost ml-auto" data-sc-remove="${idx}">Remove</button>
+            </div>
+          </div>
+        `;
+        block.querySelector(`[data-sc-field="name"]`).value = sc.name;
+        block.querySelector(`[data-sc-field="callbackId"]`).value = sc.callbackId;
+        block.querySelector(`[data-sc-field="description"]`).value = sc.description;
+        block.querySelector(`[data-sc-field="type"]`).value = sc.type || "global";
+        container.appendChild(block);
+      });
+
+      container.querySelectorAll("[data-sc-field]").forEach(el => {
+        const tag = el.tagName.toLowerCase();
+        if (tag === "select") {
+          el.addEventListener("change", onShortcutFieldChange);
+        } else {
+          el.addEventListener("input", onShortcutFieldChange);
+          el.addEventListener("blur", onShortcutFieldBlur);
+        }
+      });
+      container.querySelectorAll("[data-sc-remove]").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const idx = Number(btn.getAttribute("data-sc-remove"));
+          state.shortcuts.splice(idx, 1);
+          updateState("shortcuts", state.shortcuts);
+          renderShortcuts();
+        });
+      });
+    }
+
+    function onShortcutFieldChange(ev) {
+      const idx = Number(ev.target.getAttribute("data-idx"));
+      const field = ev.target.getAttribute("data-sc-field");
+      state.shortcuts[idx][field] = ev.target.value;
+      const debounce = ev.target.tagName.toLowerCase() !== "select";
+      updateState("shortcuts", state.shortcuts, { debounce });
+    }
+
+    function onShortcutFieldBlur(ev) {
+      const idx = Number(ev.target.getAttribute("data-idx"));
+      const field = ev.target.getAttribute("data-sc-field");
+      const sc = state.shortcuts[idx];
+      const errEl = ev.target.parentElement.querySelector(".field-error");
+      if (field === "callbackId" && sc.callbackId && !CALLBACK_ID_RE.test(sc.callbackId)) {
+        ev.target.classList.add("is-invalid");
+        errEl.textContent = STRINGS.ERR_CALLBACK_ID;
+      } else if (["name", "callbackId", "description"].indexOf(field) !== -1 && !sc[field]) {
+        ev.target.classList.add("is-invalid");
+        errEl.textContent = STRINGS.ERR_REQUIRED;
+      } else {
+        ev.target.classList.remove("is-invalid");
+        errEl.textContent = "";
+      }
+    }
+
+    /* ---------- Interactivity ---------- */
+    function renderInteractivity() {
+      const container = document.getElementById("interactivity-container");
+      container.innerHTML = `
+        <div class="flex items-center justify-between gap-4">
+          <div>
+            <div class="text-sm text-gray-200">Enable Interactivity</div>
+            <div class="text-xs text-gray-500">Receive interactive component payloads at a URL.</div>
+          </div>
+          <button type="button" class="toggle ${state.interactivity.enabled ? "is-on" : ""}" id="toggle-interactivity" aria-pressed="${state.interactivity.enabled}"></button>
+        </div>
+        <div id="interactivity-fields" class="space-y-3 ${state.interactivity.enabled ? "" : "hidden"}">
+          <div>
+            <label for="input-interactivity-url" class="block text-xs font-medium text-gray-300 mb-1">Request URL</label>
+            <input id="input-interactivity-url" type="text" class="field-input font-mono" placeholder="https://example.com/slack/interactivity" />
+            <div class="field-error" id="error-interactivity-url"></div>
+          </div>
+          <div>
+            <label for="input-menu-options-url" class="block text-xs font-medium text-gray-300 mb-1">Message Menu Options URL <span class="text-gray-500">(optional)</span></label>
+            <input id="input-menu-options-url" type="text" class="field-input font-mono" placeholder="https://example.com/slack/options" />
+            <div class="field-error" id="error-menu-options-url"></div>
+          </div>
+        </div>
+      `;
+
+      document.getElementById("input-interactivity-url").value = state.interactivity.requestUrl;
+      document.getElementById("input-menu-options-url").value = state.interactivity.messageMenuOptionsUrl;
+
+      document.getElementById("toggle-interactivity").addEventListener("click", () => {
+        const next = !state.interactivity.enabled;
+        updateState("interactivity.enabled", next);
+        renderInteractivity();
+      });
+      document.getElementById("input-interactivity-url").addEventListener("input", (ev) => {
+        updateState("interactivity.requestUrl", ev.target.value, { debounce: true });
+      });
+      document.getElementById("input-interactivity-url").addEventListener("blur", (ev) => {
+        const val = ev.target.value.trim();
+        const errEl = document.getElementById("error-interactivity-url");
+        if (val && !HTTPS_URL_RE.test(val)) {
+          ev.target.classList.add("is-invalid");
+          errEl.textContent = STRINGS.ERR_HTTPS;
+        } else {
+          ev.target.classList.remove("is-invalid");
+          errEl.textContent = "";
+        }
+      });
+      document.getElementById("input-menu-options-url").addEventListener("input", (ev) => {
+        updateState("interactivity.messageMenuOptionsUrl", ev.target.value, { debounce: true });
+      });
+      document.getElementById("input-menu-options-url").addEventListener("blur", (ev) => {
+        const val = ev.target.value.trim();
+        const errEl = document.getElementById("error-menu-options-url");
+        if (val && !HTTPS_URL_RE.test(val)) {
+          ev.target.classList.add("is-invalid");
+          errEl.textContent = STRINGS.ERR_HTTPS;
+        } else {
+          ev.target.classList.remove("is-invalid");
+          errEl.textContent = "";
+        }
+      });
+    }
+
+    /* =========================================================================
+     * VALIDATION HELPERS
+     * ========================================================================= */
+    /**
+     * Validate a single named field. Sets error text and invalid styling on the
+     * matching DOM element. Validation never blocks YAML generation.
+     */
+    function validateField(name) {
+      switch (name) {
+        case "appName": {
+          const input = document.getElementById("input-app-name");
+          const errEl = document.getElementById("error-app-name");
+          if (!state.appName) {
+            input.classList.add("is-invalid");
+            errEl.textContent = STRINGS.ERR_REQUIRED;
+          } else {
+            input.classList.remove("is-invalid");
+            errEl.textContent = "";
+          }
+          break;
+        }
+        case "backgroundColor": {
+          const input = document.getElementById("input-bg-color-hex");
+          const errEl = document.getElementById("error-bg-color");
+          if (!HEX_COLOR_RE.test(state.backgroundColor)) {
+            input.classList.add("is-invalid");
+            errEl.textContent = STRINGS.ERR_HEX;
+          } else {
+            input.classList.remove("is-invalid");
+            errEl.textContent = "";
+          }
+          break;
+        }
+        case "eventUrl": {
+          const input = document.getElementById("input-event-url");
+          const errEl = document.getElementById("error-event-url");
+          const val = state.eventSubscriptions.requestUrl;
+          if (val && !HTTPS_URL_RE.test(val)) {
+            input.classList.add("is-invalid");
+            errEl.textContent = STRINGS.ERR_HTTPS;
+          } else {
+            input.classList.remove("is-invalid");
+            errEl.textContent = "";
+          }
+          break;
+        }
+        default:
+          break;
+      }
+    }
+
+    /* =========================================================================
+     * EVENT WIRING
+     * ========================================================================= */
+    /** Attach all DOM event listeners. Called once at startup. */
+    function attachEventListeners() {
+      // Basic info
+      const appName = document.getElementById("input-app-name");
+      appName.addEventListener("input", (ev) => {
+        updateCharCounter("input-app-name", "counter-app-name");
+        updateState("appName", ev.target.value, { debounce: true });
+      });
+      appName.addEventListener("blur", () => validateField("appName"));
+
+      const shortDesc = document.getElementById("input-short-desc");
+      shortDesc.addEventListener("input", (ev) => {
+        updateCharCounter("input-short-desc", "counter-short-desc");
+        updateState("shortDescription", ev.target.value, { debounce: true });
+      });
+
+      const longDesc = document.getElementById("input-long-desc");
+      longDesc.addEventListener("input", (ev) => {
+        updateState("longDescription", ev.target.value, { debounce: true });
+      });
+
+      const colorPicker = document.getElementById("input-bg-color-picker");
+      const colorHex = document.getElementById("input-bg-color-hex");
+      colorPicker.addEventListener("input", (ev) => {
+        const v = ev.target.value.toUpperCase();
+        colorHex.value = v;
+        updateState("backgroundColor", v);
+        validateField("backgroundColor");
+      });
+      colorHex.addEventListener("input", (ev) => {
+        const v = ev.target.value;
+        updateState("backgroundColor", v, { debounce: true });
+        if (HEX_COLOR_RE.test(v)) colorPicker.value = v;
+      });
+      colorHex.addEventListener("blur", () => validateField("backgroundColor"));
+
+      // Scope tag inputs
+      const addBotScope = () => addTag("input-bot-scope", "botScopes", state.botScopes, renderScopeTags);
+      document.getElementById("btn-add-bot-scope").addEventListener("click", addBotScope);
+      document.getElementById("input-bot-scope").addEventListener("keydown", (ev) => { if (ev.key === "Enter") { ev.preventDefault(); addBotScope(); } });
+
+      const addUserScope = () => addTag("input-user-scope", "userScopes", state.userScopes, renderScopeTags);
+      document.getElementById("btn-add-user-scope").addEventListener("click", addUserScope);
+      document.getElementById("input-user-scope").addEventListener("keydown", (ev) => { if (ev.key === "Enter") { ev.preventDefault(); addUserScope(); } });
+
+      // Slash commands
+      document.getElementById("btn-add-command").addEventListener("click", () => {
+        state.slashCommands.push({ command: "/", description: "", usageHint: "", shouldEscape: false });
+        updateState("slashCommands", state.slashCommands);
+        renderSlashCommands();
+      });
+
+      // Event subscriptions
+      const eventUrl = document.getElementById("input-event-url");
+      eventUrl.addEventListener("input", (ev) => {
+        updateState("eventSubscriptions.requestUrl", ev.target.value, { debounce: true });
+      });
+      eventUrl.addEventListener("blur", () => validateField("eventUrl"));
+
+      const addBotEvent = () => addTag("input-bot-event", "eventSubscriptions.botEvents", state.eventSubscriptions.botEvents, renderEventTags);
+      document.getElementById("btn-add-bot-event").addEventListener("click", addBotEvent);
+      document.getElementById("input-bot-event").addEventListener("keydown", (ev) => { if (ev.key === "Enter") { ev.preventDefault(); addBotEvent(); } });
+
+      const addUserEvent = () => addTag("input-user-event", "eventSubscriptions.userEvents", state.eventSubscriptions.userEvents, renderEventTags);
+      document.getElementById("btn-add-user-event").addEventListener("click", addUserEvent);
+      document.getElementById("input-user-event").addEventListener("keydown", (ev) => { if (ev.key === "Enter") { ev.preventDefault(); addUserEvent(); } });
+
+      // Shortcuts
+      document.getElementById("btn-add-shortcut").addEventListener("click", () => {
+        state.shortcuts.push({ name: "", callbackId: "", description: "", type: "global" });
+        updateState("shortcuts", state.shortcuts);
+        renderShortcuts();
+      });
+
+      // Toolbar
+      document.getElementById("btn-copy").addEventListener("click", copyToClipboard);
+      document.getElementById("btn-download").addEventListener("click", downloadYAML);
+
+      // Import modal
+      document.getElementById("btn-import").addEventListener("click", openImportModal);
+      document.getElementById("btn-import-close").addEventListener("click", closeImportModal);
+      document.getElementById("btn-import-cancel").addEventListener("click", closeImportModal);
+      document.getElementById("btn-import-confirm").addEventListener("click", confirmImport);
+
+      // Reset
+      document.getElementById("btn-reset").addEventListener("click", () => {
+        if (window.confirm(STRINGS.RESET_CONFIRM)) {
+          localStorage.removeItem(STORAGE_KEY);
+          state = initState();
+          renderForm();
+          renderYAML();
+        }
+      });
+    }
+
+    /* =========================================================================
+     * COPY / DOWNLOAD / IMPORT
+     * ========================================================================= */
+    /** Copy the current YAML output to the clipboard. */
+    function copyToClipboard() {
+      const text = outputCodeEl().innerText;
+      const finish = () => {
+        const badge = document.getElementById("copied-badge");
+        badge.classList.add("is-visible");
+        setTimeout(() => badge.classList.remove("is-visible"), 1500);
+      };
+
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(finish).catch(() => fallbackCopy(text, finish));
+      } else {
+        fallbackCopy(text, finish);
+      }
+    }
+
+    function fallbackCopy(text, done) {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.style.position = "fixed";
+      ta.style.left = "-9999px";
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand("copy"); } catch (e) { /* ignore */ }
+      document.body.removeChild(ta);
+      done();
+    }
+
+    /** Trigger a download of the current YAML as manifest.yaml. */
+    function downloadYAML() {
+      const text = outputCodeEl().innerText;
+      const blob = new Blob([text], { type: "application/x-yaml;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "manifest.yaml";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+
+    function openImportModal() {
+      document.getElementById("import-error").textContent = "";
+      document.getElementById("import-textarea").value = "";
+      document.getElementById("import-modal").classList.remove("hidden");
+    }
+
+    function closeImportModal() {
+      document.getElementById("import-modal").classList.add("hidden");
+    }
+
+    /** Parse the pasted YAML, validate, and replace state. */
+    function confirmImport() {
+      const errEl = document.getElementById("import-error");
+      const text = document.getElementById("import-textarea").value;
+      errEl.textContent = "";
+
+      if (!text.trim()) {
+        errEl.textContent = STRINGS.IMPORT_EMPTY;
+        return;
+      }
+      if (typeof window.jsyaml === "undefined" || !window.jsyaml || typeof window.jsyaml.load !== "function") {
+        errEl.textContent = STRINGS.IMPORT_PARSE_ERROR + "js-yaml library is unavailable.";
+        return;
+      }
+
+      let parsed;
+      try {
+        parsed = window.jsyaml.load(text);
+      } catch (err) {
+        errEl.textContent = STRINGS.IMPORT_PARSE_ERROR + (err && err.message ? err.message : String(err));
+        return;
+      }
+
+      if (!parsed || typeof parsed !== "object") {
+        errEl.textContent = STRINGS.IMPORT_INVALID_STRUCTURE;
+        return;
+      }
+
+      importYAML(parsed);
+      closeImportModal();
+    }
+
+    /**
+     * Populate state from a parsed manifest object.
+     * Missing fields are filled with defaults — best-effort mapping.
+     * @param {object} parsed
+     */
+    function importYAML(parsed) {
+      const next = initState();
+      const di = parsed.display_information || {};
+      if (typeof di.name === "string") next.appName = di.name.slice(0, 35);
+      if (typeof di.description === "string") next.shortDescription = di.description.slice(0, 140);
+      if (typeof di.long_description === "string") next.longDescription = di.long_description;
+      if (typeof di.background_color === "string" && HEX_COLOR_RE.test(di.background_color)) {
+        next.backgroundColor = di.background_color;
+      }
+
+      const features = parsed.features || {};
+      const home = features.app_home || {};
+      next.toggles.messagesTabEnabled = Boolean(home.messages_tab_enabled);
+      next.toggles.messagesTabReadOnly = Boolean(home.messages_tab_read_only_enabled);
+      next.toggles.incomingWebhooks = Boolean(features.incoming_webhooks);
+
+      if (Array.isArray(features.slash_commands)) {
+        next.slashCommands = features.slash_commands.map((c) => ({
+          command: typeof c.command === "string" ? c.command : "",
+          description: typeof c.description === "string" ? c.description : "",
+          usageHint: typeof c.usage_hint === "string" ? c.usage_hint : "",
+          shouldEscape: Boolean(c.should_escape)
+        }));
+      }
+      if (Array.isArray(features.shortcuts)) {
+        next.shortcuts = features.shortcuts.map((s) => ({
+          name: typeof s.name === "string" ? s.name : "",
+          callbackId: typeof s.callback_id === "string" ? s.callback_id : "",
+          description: typeof s.description === "string" ? s.description : "",
+          type: s.type === "message" ? "message" : "global"
+        }));
+      }
+
+      const oauth = parsed.oauth_config || {};
+      const scopes = oauth.scopes || {};
+      if (Array.isArray(scopes.bot)) {
+        next.botScopes = scopes.bot.filter((v) => typeof v === "string" && v !== "incoming-webhook");
+        if (scopes.bot.indexOf("incoming-webhook") !== -1) next.toggles.incomingWebhooks = true;
+      }
+      if (Array.isArray(scopes.user)) {
+        next.userScopes = scopes.user.filter((v) => typeof v === "string");
+      }
+
+      const settings = parsed.settings || {};
+      const eventSubs = settings.event_subscriptions || {};
+      if (typeof eventSubs.request_url === "string") next.eventSubscriptions.requestUrl = eventSubs.request_url;
+      if (Array.isArray(eventSubs.bot_events)) next.eventSubscriptions.botEvents = eventSubs.bot_events.filter(v => typeof v === "string");
+      if (Array.isArray(eventSubs.user_events)) next.eventSubscriptions.userEvents = eventSubs.user_events.filter(v => typeof v === "string");
+
+      const inter = settings.interactivity || {};
+      if (inter.is_enabled) {
+        next.interactivity.enabled = true;
+        if (typeof inter.request_url === "string") next.interactivity.requestUrl = inter.request_url;
+        if (typeof inter.message_menu_options_url === "string") next.interactivity.messageMenuOptionsUrl = inter.message_menu_options_url;
+      }
+
+      next.toggles.socketMode = Boolean(settings.socket_mode_enabled);
+      next.toggles.orgDeploy = Boolean(settings.org_deploy_enabled);
+      next.toggles.tokenRotation = Boolean(settings.token_rotation_enabled);
+
+      state = next;
+      saveState();
+      renderForm();
+      renderYAML();
+    }
+
+    /* =========================================================================
+     * UTILITIES
+     * ========================================================================= */
+    function escapeHTML(str) {
+      return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    }
+
+    /* =========================================================================
+     * STARTUP
+     * ========================================================================= */
+    function checkLibraryAvailable() {
+      const banner = document.getElementById("library-warning");
+      if (typeof window.jsyaml === "undefined" || !window.jsyaml) {
+        banner.className = "banner-error mb-4";
+        banner.textContent = STRINGS.LIBRARY_ERROR;
+        banner.classList.remove("hidden");
+      }
+    }
+
+    function boot() {
+      loadState();
+      attachEventListeners();
+      renderForm();
+      checkLibraryAvailable();
+      renderYAML();
+    }
+
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", boot);
+    } else {
+      boot();
+    }
+  </script>
+</body>
+</html>
