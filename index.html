@@ -3,11 +3,13 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="referrer" content="no-referrer" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'" />
   <title>Slack App Manifest Generator</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.tailwindcss.com/3.4.17" defer referrerpolicy="no-referrer"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js"
           integrity="sha512-CSBhVREyzHAjAFfBlIBakjOf8GRTGW/QFt/0/v1/n0/v3vO1jrkXlJqjjQ5fXIoXSU8z1jxiU9MaC7K7XSWfWg=="
-          crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+          crossorigin="anonymous" referrerpolicy="no-referrer" defer></script>
   <style>
     :root {
       color-scheme: dark;
@@ -167,6 +169,11 @@
       border-color: #3a1f23;
     }
     .btn-danger-ghost:hover { background-color: #2a1518; }
+    .btn:focus-visible,
+    .tag-pill-remove:focus-visible {
+      outline: 2px solid #6366f1;
+      outline-offset: 2px;
+    }
 
     /* Output panel */
     .output-pre {
@@ -206,6 +213,8 @@
       border-radius: 10px;
       width: 100%;
       max-width: 720px;
+      max-height: calc(100vh - 32px);
+      overflow-y: auto;
       padding: 20px;
     }
 
@@ -225,6 +234,7 @@
       pointer-events: none;
     }
     .copied-badge.is-visible { opacity: 1; }
+    .copied-badge.is-error { background-color: #b91c1c; }
 
     /* Banner */
     .banner-error {
@@ -245,6 +255,13 @@
         position: sticky;
         top: 24px;
         align-self: flex-start;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        scroll-behavior: auto !important;
+        transition-duration: 0.01ms !important;
       }
     }
   </style>
@@ -270,7 +287,7 @@
   </header>
 
   <main class="max-w-7xl mx-auto px-6 py-6">
-    <div id="library-warning" class="hidden mb-4"></div>
+    <div id="library-warning" class="hidden mb-4" role="alert"></div>
 
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <!-- LEFT COLUMN: FORM -->
@@ -305,9 +322,9 @@
               <div class="field-error" id="error-long-desc"></div>
             </div>
             <div>
-              <label class="block text-xs font-medium text-gray-300 mb-1">Background Color</label>
+              <label for="input-bg-color-hex" class="block text-xs font-medium text-gray-300 mb-1">Background Color</label>
               <div class="flex items-center gap-2">
-                <input id="input-bg-color-picker" type="color" class="field-input" />
+                <input id="input-bg-color-picker" type="color" class="field-input" aria-label="Background color picker" />
                 <input id="input-bg-color-hex" type="text" class="field-input font-mono" placeholder="#2C2D30" />
               </div>
               <div class="field-error" id="error-bg-color"></div>
@@ -332,7 +349,7 @@
           </div>
           <div class="space-y-5">
             <div>
-              <label class="block text-xs font-medium text-gray-300 mb-2">Bot Token Scopes</label>
+              <label for="input-bot-scope" class="block text-xs font-medium text-gray-300 mb-2">Bot Token Scopes</label>
               <div id="bot-scopes-tags" class="flex flex-wrap gap-2 mb-2 min-h-[24px]"></div>
               <div class="flex gap-2">
                 <input id="input-bot-scope" type="text" class="field-input font-mono" placeholder="e.g. channels:read" />
@@ -340,7 +357,7 @@
               </div>
             </div>
             <div>
-              <label class="block text-xs font-medium text-gray-300 mb-2">User Token Scopes</label>
+              <label for="input-user-scope" class="block text-xs font-medium text-gray-300 mb-2">User Token Scopes</label>
               <div id="user-scopes-tags" class="flex flex-wrap gap-2 mb-2 min-h-[24px]"></div>
               <div class="flex gap-2">
                 <input id="input-user-scope" type="text" class="field-input font-mono" placeholder="e.g. identity.basic" />
@@ -375,7 +392,7 @@
               <div class="field-error" id="error-event-url"></div>
             </div>
             <div>
-              <label class="block text-xs font-medium text-gray-300 mb-2">Bot Events</label>
+              <label for="input-bot-event" class="block text-xs font-medium text-gray-300 mb-2">Bot Events</label>
               <div id="bot-events-tags" class="flex flex-wrap gap-2 mb-2 min-h-[24px]"></div>
               <div class="flex gap-2">
                 <input id="input-bot-event" type="text" class="field-input font-mono" placeholder="e.g. app_mention" />
@@ -383,7 +400,7 @@
               </div>
             </div>
             <div>
-              <label class="block text-xs font-medium text-gray-300 mb-2">User Events</label>
+              <label for="input-user-event" class="block text-xs font-medium text-gray-300 mb-2">User Events</label>
               <div id="user-events-tags" class="flex flex-wrap gap-2 mb-2 min-h-[24px]"></div>
               <div class="flex gap-2">
                 <input id="input-user-event" type="text" class="field-input font-mono" placeholder="e.g. message.im" />
@@ -425,7 +442,7 @@
               <p class="section-subtitle">Updates live as you edit.</p>
             </div>
             <div class="relative flex items-center gap-2">
-              <span id="copied-badge" class="copied-badge">Copied</span>
+              <span id="copied-badge" class="copied-badge" role="status" aria-live="polite"></span>
               <button id="btn-copy" type="button" class="btn btn-secondary" title="Copy YAML to clipboard">
                 <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
                 Copy to Clipboard
@@ -436,7 +453,7 @@
               </button>
             </div>
           </div>
-          <div id="output-error" class="hidden mb-3"></div>
+          <div id="output-error" class="hidden mb-3" role="alert"></div>
           <pre class="output-pre"><code id="output-code"></code></pre>
         </div>
       </div>
@@ -452,7 +469,7 @@
       </div>
       <p class="section-subtitle mb-3">Paste an existing Slack manifest YAML. Confirming will replace your current form state.</p>
       <textarea id="import-textarea" rows="14" class="field-textarea font-mono" placeholder="_metadata:&#10;  major_version: 1&#10;  minor_version: 1&#10;display_information:&#10;  name: ..."></textarea>
-      <div id="import-error" class="field-error mt-2"></div>
+      <div id="import-error" class="field-error mt-2" role="alert"></div>
       <div class="flex justify-end gap-2 mt-4">
         <button id="btn-import-cancel" type="button" class="btn btn-secondary">Cancel</button>
         <button id="btn-import-confirm" type="button" class="btn btn-primary">Import</button>
@@ -472,9 +489,8 @@
       IMPORT_EMPTY: "Please paste a YAML document.",
       IMPORT_PARSE_ERROR: "Could not parse YAML: ",
       IMPORT_INVALID_STRUCTURE: "The document is not a valid Slack manifest object.",
-      IMPORT_SUCCESS: "Imported successfully.",
-      COPY_LABEL: "Copy to Clipboard",
       COPY_SUCCESS: "Copied",
+      COPY_FAILURE: "Copy failed",
       ERR_REQUIRED: "This field is required.",
       ERR_HEX: "Must be a valid hex color, e.g. #2C2D30.",
       ERR_COMMAND_SLASH: "Command must start with \"/\".",
@@ -489,8 +505,7 @@
     const DEFAULT_BG_COLOR = "#2C2D30";
     const DEFAULT_BOT_SCOPES = ["commands", "chat:write"];
 
-    const HEX_COLOR_RE = /^#([0-9a-fA-F]{6})$/;
-    const HTTPS_URL_RE = /^https:\/\/[^\s]+$/i;
+    const HEX_COLOR_RE = /^#[0-9a-fA-F]{6}$/;
     const CALLBACK_ID_RE = /^[A-Za-z0-9_]+$/;
 
     /** Feature toggles — declared as data so they render uniformly. */
@@ -511,6 +526,9 @@
 
     /** Debounce handle for text-input renders. */
     let renderDebounce = null;
+    let currentOutput = "";
+    let copyBadgeTimer = null;
+    let importModalTrigger = null;
 
     /**
      * Build the initial default state. Used at first load and on Reset.
@@ -559,6 +577,14 @@
       }
     }
 
+    function clearPersistedState() {
+      try {
+        localStorage.removeItem(STORAGE_KEY);
+      } catch (err) {
+        // Resetting the in-memory workspace must not depend on storage access.
+      }
+    }
+
     /** Restore state from localStorage if present and valid. */
     function loadState() {
       try {
@@ -574,44 +600,91 @@
     }
 
     /**
-     * Deep-merge persisted state on top of a fresh defaults object, so that
-     * adding new fields to defaults in future versions still works.
+     * Rebuild persisted state from known fields. Storage is untrusted input:
+     * malformed values must never reach rendering or manifest generation.
      */
     function mergeWithDefaults(persisted) {
       const defaults = initState();
+      if (!isRecord(persisted)) return defaults;
+
+      const toggles = asRecord(persisted.toggles);
+      TOGGLE_DEFS.forEach((def) => {
+        defaults.toggles[def.key] = toggles[def.key] === true;
+      });
+
+      defaults.appName = stringOrDefault(persisted.appName);
+      defaults.shortDescription = stringOrDefault(persisted.shortDescription);
+      defaults.longDescription = stringOrDefault(persisted.longDescription);
+      defaults.backgroundColor = stringOrDefault(persisted.backgroundColor, DEFAULT_BG_COLOR);
+      defaults.botScopes = normalizeStringList(persisted.botScopes, DEFAULT_BOT_SCOPES);
+      defaults.userScopes = normalizeStringList(persisted.userScopes);
+      defaults.slashCommands = normalizeList(persisted.slashCommands, normalizeCommand);
+      defaults.shortcuts = normalizeList(persisted.shortcuts, normalizeShortcut);
+      defaults.eventSubscriptions = normalizeEventSubscriptions(persisted.eventSubscriptions);
+      defaults.interactivity = normalizeInteractivity(persisted.interactivity);
+      return defaults;
+    }
+
+    function isRecord(value) {
+      return value !== null && typeof value === "object" && !Array.isArray(value);
+    }
+
+    function asRecord(value) {
+      return isRecord(value) ? value : {};
+    }
+
+    function stringOrDefault(value, fallback = "") {
+      return typeof value === "string" ? value : fallback;
+    }
+
+    function normalizeList(value, normalizer) {
+      return Array.isArray(value) ? value.map(normalizer) : [];
+    }
+
+    function normalizeStringList(value, fallback = []) {
+      if (!Array.isArray(value)) return [...fallback];
+      const entries = value
+        .filter((entry) => typeof entry === "string")
+        .map((entry) => entry.trim())
+        .filter(Boolean);
+      return Array.from(new Set(entries));
+    }
+
+    function normalizeCommand(value) {
+      const command = asRecord(value);
       return {
-        appName:             typeof persisted.appName === "string" ? persisted.appName : defaults.appName,
-        shortDescription:    typeof persisted.shortDescription === "string" ? persisted.shortDescription : defaults.shortDescription,
-        longDescription:     typeof persisted.longDescription === "string" ? persisted.longDescription : defaults.longDescription,
-        backgroundColor:     typeof persisted.backgroundColor === "string" ? persisted.backgroundColor : defaults.backgroundColor,
-        toggles:             Object.assign({}, defaults.toggles, persisted.toggles || {}),
-        botScopes:           Array.isArray(persisted.botScopes) ? persisted.botScopes.slice() : defaults.botScopes,
-        userScopes:          Array.isArray(persisted.userScopes) ? persisted.userScopes.slice() : defaults.userScopes,
-        slashCommands:       Array.isArray(persisted.slashCommands) ? persisted.slashCommands.map(normalizeCommand) : defaults.slashCommands,
-        eventSubscriptions:  Object.assign({}, defaults.eventSubscriptions, persisted.eventSubscriptions || {}, {
-          botEvents: Array.isArray(persisted.eventSubscriptions && persisted.eventSubscriptions.botEvents) ? persisted.eventSubscriptions.botEvents.slice() : [],
-          userEvents: Array.isArray(persisted.eventSubscriptions && persisted.eventSubscriptions.userEvents) ? persisted.eventSubscriptions.userEvents.slice() : []
-        }),
-        shortcuts:           Array.isArray(persisted.shortcuts) ? persisted.shortcuts.map(normalizeShortcut) : defaults.shortcuts,
-        interactivity:       Object.assign({}, defaults.interactivity, persisted.interactivity || {})
+        command: stringOrDefault(command.command),
+        description: stringOrDefault(command.description),
+        usageHint: stringOrDefault(command.usageHint),
+        shouldEscape: command.shouldEscape === true
       };
     }
 
-    function normalizeCommand(c) {
+    function normalizeShortcut(value) {
+      const shortcut = asRecord(value);
       return {
-        command: typeof c.command === "string" ? c.command : "",
-        description: typeof c.description === "string" ? c.description : "",
-        usageHint: typeof c.usageHint === "string" ? c.usageHint : "",
-        shouldEscape: Boolean(c.shouldEscape)
+        name: stringOrDefault(shortcut.name),
+        callbackId: stringOrDefault(shortcut.callbackId),
+        description: stringOrDefault(shortcut.description),
+        type: shortcut.type === "message" ? "message" : "global"
       };
     }
 
-    function normalizeShortcut(s) {
+    function normalizeEventSubscriptions(value) {
+      const subscriptions = asRecord(value);
       return {
-        name: typeof s.name === "string" ? s.name : "",
-        callbackId: typeof s.callbackId === "string" ? s.callbackId : "",
-        description: typeof s.description === "string" ? s.description : "",
-        type: s.type === "message" ? "message" : "global"
+        requestUrl: stringOrDefault(subscriptions.requestUrl),
+        botEvents: normalizeStringList(subscriptions.botEvents),
+        userEvents: normalizeStringList(subscriptions.userEvents)
+      };
+    }
+
+    function normalizeInteractivity(value) {
+      const interactivity = asRecord(value);
+      return {
+        enabled: interactivity.enabled === true,
+        requestUrl: stringOrDefault(interactivity.requestUrl),
+        messageMenuOptionsUrl: stringOrDefault(interactivity.messageMenuOptionsUrl)
       };
     }
 
@@ -625,7 +698,7 @@
      * @param {object} [options]
      * @param {boolean} [options.debounce] Whether to debounce the render.
      */
-    function updateState(path, value, options) {
+    function updateState(path, value, options = {}) {
       const parts = path.split(".");
       let target = state;
       for (let i = 0; i < parts.length - 1; i++) {
@@ -633,16 +706,31 @@
       }
       target[parts[parts.length - 1]] = value;
       saveState();
+      scheduleRender(options.debounce === true);
+    }
 
-      if (options && options.debounce) {
-        if (renderDebounce !== null) clearTimeout(renderDebounce);
-        renderDebounce = setTimeout(() => {
-          renderDebounce = null;
-          renderYAML();
-        }, DEBOUNCE_MS);
-      } else {
-        renderYAML();
+    function scheduleRender(debounce) {
+      if (renderDebounce !== null) {
+        clearTimeout(renderDebounce);
+        renderDebounce = null;
       }
+
+      if (!debounce) {
+        renderYAML();
+        return;
+      }
+
+      renderDebounce = setTimeout(() => {
+        renderDebounce = null;
+        renderYAML();
+      }, DEBOUNCE_MS);
+    }
+
+    function flushPendingRender() {
+      if (renderDebounce === null) return;
+      clearTimeout(renderDebounce);
+      renderDebounce = null;
+      renderYAML();
     }
 
     /* =========================================================================
@@ -675,7 +763,7 @@
         }
       };
 
-      const validCommands = state.slashCommands.filter(c => c.command && c.description);
+      const validCommands = state.slashCommands.filter(c => c.command.trim() && c.description.trim());
       if (validCommands.length > 0) {
         features.slash_commands = validCommands.map(c => {
           const entry = {
@@ -690,7 +778,7 @@
         });
       }
 
-      const validShortcuts = state.shortcuts.filter(s => s.name && s.callbackId && s.description);
+      const validShortcuts = state.shortcuts.filter(s => s.name.trim() && s.callbackId.trim() && s.description.trim());
       if (validShortcuts.length > 0) {
         features.shortcuts = validShortcuts.map(s => ({
           name: s.name,
@@ -713,7 +801,7 @@
         : state.botScopes.slice();
 
       if (effectiveBotScopes.length > 0) oauthScopes.bot = effectiveBotScopes;
-      if (state.userScopes.length > 0)   oauthScopes.user = state.userScopes;
+      if (state.userScopes.length > 0) oauthScopes.user = state.userScopes.slice();
 
       const oauthConfig = {};
       if (Object.keys(oauthScopes).length > 0) oauthConfig.scopes = oauthScopes;
@@ -722,7 +810,7 @@
       // settings
       const settings = {};
 
-      const hasEventUrl = HTTPS_URL_RE.test(state.eventSubscriptions.requestUrl);
+      const hasEventUrl = isValidHttpsUrl(state.eventSubscriptions.requestUrl);
       const hasBotEvents = state.eventSubscriptions.botEvents.length > 0;
       const hasUserEvents = state.eventSubscriptions.userEvents.length > 0;
       if (hasEventUrl || hasBotEvents || hasUserEvents) {
@@ -735,11 +823,10 @@
 
       if (state.interactivity.enabled) {
         const interactivityBlock = { is_enabled: true };
-        if (HTTPS_URL_RE.test(state.interactivity.requestUrl)) {
+        if (isValidHttpsUrl(state.interactivity.requestUrl)) {
           interactivityBlock.request_url = state.interactivity.requestUrl;
         }
-        if (state.interactivity.messageMenuOptionsUrl &&
-            HTTPS_URL_RE.test(state.interactivity.messageMenuOptionsUrl)) {
+        if (isValidHttpsUrl(state.interactivity.messageMenuOptionsUrl)) {
           interactivityBlock.message_menu_options_url = state.interactivity.messageMenuOptionsUrl;
         }
         settings.interactivity = interactivityBlock;
@@ -770,9 +857,8 @@
       errEl.classList.add("hidden");
       errEl.textContent = "";
 
-      if (typeof window.jsyaml === "undefined" || !window.jsyaml || typeof window.jsyaml.dump !== "function") {
-        // Library failed — fallback to JSON.
-        outputCodeEl().textContent = JSON.stringify(manifest, null, 2);
+      if (!isYamlLibraryAvailable()) {
+        setOutput(JSON.stringify(manifest, null, 2));
         return;
       }
 
@@ -785,60 +871,106 @@
           forceQuotes: false
         });
       } catch (err) {
-        errEl.textContent = STRINGS.YAML_DUMP_ERROR + (err && err.message ? err.message : String(err));
+        errEl.textContent = STRINGS.YAML_DUMP_ERROR + getErrorMessage(err);
         errEl.className = "banner-error mb-3";
-        outputCodeEl().textContent = JSON.stringify(manifest, null, 2);
+        setOutput(JSON.stringify(manifest, null, 2));
         return;
       }
 
-      outputCodeEl().innerHTML = highlightYAML(yamlString);
+      currentOutput = yamlString;
+      renderHighlightedYAML(yamlString);
     }
 
-    /**
-     * A small, regex-driven YAML highlighter. Only colors keys, strings,
-     * booleans/numbers, and the list-item dash — keeps the implementation
-     * dependency-free.
-     */
-    function highlightYAML(yamlString) {
-      const escape = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    function setOutput(text) {
+      currentOutput = text;
+      outputCodeEl().textContent = text;
+    }
+
+    /** Render syntax tokens with text nodes so YAML can never become markup. */
+    function renderHighlightedYAML(yamlString) {
+      const output = outputCodeEl();
+      const fragment = document.createDocumentFragment();
       const lines = yamlString.split("\n");
-      return lines.map((rawLine) => {
-        let line = escape(rawLine);
 
-        // Comment
-        const hashIdx = line.indexOf("#");
-        let commentPart = "";
-        if (hashIdx >= 0) {
-          // Only treat as comment if # is preceded by whitespace or start of line.
-          const before = line.slice(0, hashIdx);
-          if (/^\s*$/.test(before) || /\s$/.test(before)) {
-            commentPart = '<span class="yaml-comment">' + line.slice(hashIdx) + '</span>';
-            line = before;
-          }
+      lines.forEach((line, index) => {
+        if (index > 0) fragment.appendChild(document.createTextNode("\n"));
+        fragment.appendChild(createYAMLLine(line));
+      });
+
+      output.textContent = "";
+      output.appendChild(fragment);
+    }
+
+    function createYAMLLine(line) {
+      const fragment = document.createDocumentFragment();
+      const commentIndex = findYAMLCommentStart(line);
+      const content = commentIndex === -1 ? line : line.slice(0, commentIndex);
+      const keyMatch = content.match(/^(\s*)(-\s+)?([A-Za-z_][\w-]*)(:)(\s*)(.*)$/);
+
+      if (keyMatch) {
+        const [, indent, listPrefix = "", key, colon, spacing, value] = keyMatch;
+        appendYAMLToken(fragment, "", indent);
+        if (listPrefix) appendYAMLToken(fragment, "yaml-dash", listPrefix);
+        appendYAMLToken(fragment, "yaml-key", key);
+        appendYAMLToken(fragment, "", colon + spacing);
+        appendYAMLValue(fragment, value);
+      } else {
+        const listMatch = content.match(/^(\s*)(-)(\s+)(.*)$/);
+        if (listMatch) {
+          appendYAMLToken(fragment, "", listMatch[1]);
+          appendYAMLToken(fragment, "yaml-dash", listMatch[2]);
+          appendYAMLToken(fragment, "", listMatch[3]);
+          appendYAMLValue(fragment, listMatch[4]);
+        } else {
+          appendYAMLToken(fragment, "", content);
         }
+      }
 
-        // List dash
-        line = line.replace(/^(\s*)(-)(\s)/, '$1<span class="yaml-dash">$2</span>$3');
+      if (commentIndex !== -1) {
+        appendYAMLToken(fragment, "yaml-comment", line.slice(commentIndex));
+      }
+      return fragment;
+    }
 
-        // Key: value pattern
-        line = line.replace(/^(\s*)([A-Za-z_][\w\-]*)(:)(\s*)(.*)$/, function (m, indent, key, colon, sp, rest) {
-          let valueHTML = rest;
-          if (rest.length > 0) {
-            if (/^(true|false)$/.test(rest)) {
-              valueHTML = '<span class="yaml-bool">' + rest + '</span>';
-            } else if (/^-?\d+(\.\d+)?$/.test(rest)) {
-              valueHTML = '<span class="yaml-number">' + rest + '</span>';
-            } else if (/^null$/.test(rest)) {
-              valueHTML = '<span class="yaml-null">' + rest + '</span>';
-            } else {
-              valueHTML = '<span class="yaml-string">' + rest + '</span>';
-            }
-          }
-          return indent + '<span class="yaml-key">' + key + '</span>' + colon + sp + valueHTML;
-        });
+    function appendYAMLValue(fragment, value) {
+      if (!value) return;
+      let className = "yaml-string";
+      if (/^(true|false)$/.test(value)) className = "yaml-bool";
+      else if (/^-?\d+(\.\d+)?$/.test(value)) className = "yaml-number";
+      else if (value === "null") className = "yaml-null";
+      appendYAMLToken(fragment, className, value);
+    }
 
-        return line + commentPart;
-      }).join("\n");
+    function appendYAMLToken(fragment, className, text) {
+      if (!text) return;
+      if (!className) {
+        fragment.appendChild(document.createTextNode(text));
+        return;
+      }
+      const token = document.createElement("span");
+      token.className = className;
+      token.textContent = text;
+      fragment.appendChild(token);
+    }
+
+    function findYAMLCommentStart(line) {
+      let inSingleQuotes = false;
+      let inDoubleQuotes = false;
+
+      for (let i = 0; i < line.length; i++) {
+        const char = line[i];
+        if (char === "\\" && inDoubleQuotes) {
+          i++;
+          continue;
+        }
+        if (char === "'" && !inDoubleQuotes) inSingleQuotes = !inSingleQuotes;
+        if (char === '"' && !inSingleQuotes) inDoubleQuotes = !inDoubleQuotes;
+        if (char === "#" && !inSingleQuotes && !inDoubleQuotes &&
+            (i === 0 || /\s/.test(line[i - 1]))) {
+          return i;
+        }
+      }
+      return -1;
     }
 
     /* =========================================================================
@@ -846,6 +978,8 @@
      * ========================================================================= */
     /** Push the entire state into the form DOM. Called only when state is replaced wholesale. */
     function renderForm() {
+      clearValidationState();
+
       // Basic info
       document.getElementById("input-app-name").value = state.appName;
       document.getElementById("input-short-desc").value = state.shortDescription;
@@ -859,11 +993,6 @@
       renderToggles();
 
       // Tag inputs
-      renderTags("bot-scopes-tags", state.botScopes, (idx) => {
-        state.botScopes.splice(idx, 1);
-        updateState("botScopes", state.botScopes);
-        renderTags("bot-scopes-tags", state.botScopes, arguments.callee);
-      });
       renderScopeTags();
       renderEventTags();
 
@@ -878,6 +1007,16 @@
       renderInteractivity();
     }
 
+    function clearValidationState() {
+      document.querySelectorAll(".is-invalid").forEach((input) => {
+        input.classList.remove("is-invalid");
+        input.setAttribute("aria-invalid", "false");
+      });
+      document.querySelectorAll(".field-error").forEach((error) => {
+        error.textContent = "";
+      });
+    }
+
     function updateCharCounter(inputId, counterId) {
       const input = document.getElementById(inputId);
       const counter = document.getElementById(counterId);
@@ -887,36 +1026,42 @@
     /* ---------- Toggles ---------- */
     function renderToggles() {
       const container = document.getElementById("toggles-container");
-      container.innerHTML = "";
-      TOGGLE_DEFS.forEach(def => {
+      container.textContent = "";
+      TOGGLE_DEFS.forEach((def) => {
         const row = document.createElement("div");
         row.className = "flex items-center justify-between gap-4";
-        row.innerHTML = `
-          <div>
-            <div class="text-sm text-gray-200">${escapeHTML(def.label)}</div>
-            <div class="text-xs text-gray-500">${escapeHTML(def.description)}</div>
-          </div>
-          <button type="button" class="toggle ${state.toggles[def.key] ? "is-on" : ""}" data-toggle-key="${def.key}" aria-pressed="${state.toggles[def.key]}"></button>
-        `;
-        container.appendChild(row);
-      });
-      container.querySelectorAll("[data-toggle-key]").forEach(btn => {
-        btn.addEventListener("click", () => {
-          const key = btn.getAttribute("data-toggle-key");
-          const next = !state.toggles[key];
-          updateState("toggles." + key, next);
-          btn.classList.toggle("is-on", next);
-          btn.setAttribute("aria-pressed", String(next));
-          // If incomingWebhooks toggled, scope list changes too — re-render scope tags.
-          if (key === "incomingWebhooks") renderScopeTags();
+
+        const copy = document.createElement("div");
+        const label = document.createElement("div");
+        label.className = "text-sm text-gray-200";
+        label.textContent = def.label;
+        const description = document.createElement("div");
+        description.className = "text-xs text-gray-500";
+        description.textContent = def.description;
+        copy.append(label, description);
+
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = `toggle${state.toggles[def.key] ? " is-on" : ""}`;
+        button.dataset.toggleKey = def.key;
+        button.setAttribute("aria-label", def.label);
+        button.setAttribute("aria-pressed", String(state.toggles[def.key]));
+        button.addEventListener("click", () => {
+          const next = !state.toggles[def.key];
+          updateState(`toggles.${def.key}`, next);
+          button.classList.toggle("is-on", next);
+          button.setAttribute("aria-pressed", String(next));
         });
+
+        row.append(copy, button);
+        container.appendChild(row);
       });
     }
 
     /* ---------- Tags (generic) ---------- */
     function renderTags(containerId, items, onRemove) {
       const container = document.getElementById(containerId);
-      container.innerHTML = "";
+      container.textContent = "";
       if (items.length === 0) {
         const empty = document.createElement("div");
         empty.className = "text-xs text-gray-600 italic";
@@ -924,37 +1069,47 @@
         container.appendChild(empty);
         return;
       }
+
+      const fragment = document.createDocumentFragment();
       items.forEach((value, idx) => {
         const pill = document.createElement("span");
         pill.className = "tag-pill";
-        pill.innerHTML = `<span>${escapeHTML(value)}</span><button type="button" class="tag-pill-remove" aria-label="Remove ${escapeHTML(value)}">x</button>`;
-        pill.querySelector("button").addEventListener("click", () => onRemove(idx));
-        container.appendChild(pill);
+        const label = document.createElement("span");
+        label.textContent = value;
+        const remove = document.createElement("button");
+        remove.type = "button";
+        remove.className = "tag-pill-remove";
+        remove.setAttribute("aria-label", `Remove ${value}`);
+        remove.textContent = "×";
+        remove.addEventListener("click", () => onRemove(idx));
+        pill.append(label, remove);
+        fragment.appendChild(pill);
       });
+      container.appendChild(fragment);
+    }
+
+    function removeAtIndex(items, index) {
+      return items.filter((_, itemIndex) => itemIndex !== index);
     }
 
     function renderScopeTags() {
       renderTags("bot-scopes-tags", state.botScopes, (idx) => {
-        state.botScopes.splice(idx, 1);
-        updateState("botScopes", state.botScopes);
+        updateState("botScopes", removeAtIndex(state.botScopes, idx));
         renderScopeTags();
       });
       renderTags("user-scopes-tags", state.userScopes, (idx) => {
-        state.userScopes.splice(idx, 1);
-        updateState("userScopes", state.userScopes);
+        updateState("userScopes", removeAtIndex(state.userScopes, idx));
         renderScopeTags();
       });
     }
 
     function renderEventTags() {
       renderTags("bot-events-tags", state.eventSubscriptions.botEvents, (idx) => {
-        state.eventSubscriptions.botEvents.splice(idx, 1);
-        updateState("eventSubscriptions.botEvents", state.eventSubscriptions.botEvents);
+        updateState("eventSubscriptions.botEvents", removeAtIndex(state.eventSubscriptions.botEvents, idx));
         renderEventTags();
       });
       renderTags("user-events-tags", state.eventSubscriptions.userEvents, (idx) => {
-        state.eventSubscriptions.userEvents.splice(idx, 1);
-        updateState("eventSubscriptions.userEvents", state.eventSubscriptions.userEvents);
+        updateState("eventSubscriptions.userEvents", removeAtIndex(state.eventSubscriptions.userEvents, idx));
         renderEventTags();
       });
     }
@@ -967,8 +1122,7 @@
         inputEl.value = "";
         return;
       }
-      listRef.push(value);
-      updateState(listKeyPath, listRef);
+      updateState(listKeyPath, [...listRef, value]);
       inputEl.value = "";
       renderFn();
     }
@@ -991,21 +1145,21 @@
           <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
               <label class="block text-xs font-medium text-gray-300 mb-1">Command</label>
-              <input type="text" class="field-input font-mono" data-cmd-field="command" data-idx="${idx}" placeholder="/example" />
-              <div class="field-error" data-error-for="command-${idx}"></div>
+              <input type="text" class="field-input font-mono" data-cmd-field="command" data-idx="${idx}" aria-label="Command ${idx + 1}" aria-describedby="error-command-${idx}" placeholder="/example" />
+              <div class="field-error" id="error-command-${idx}" data-error-for="command-${idx}"></div>
             </div>
             <div>
               <label class="block text-xs font-medium text-gray-300 mb-1">Description</label>
-              <input type="text" class="field-input" data-cmd-field="description" data-idx="${idx}" placeholder="What it does" />
-              <div class="field-error" data-error-for="cmd-desc-${idx}"></div>
+              <input type="text" class="field-input" data-cmd-field="description" data-idx="${idx}" aria-label="Command ${idx + 1} description" aria-describedby="error-command-description-${idx}" placeholder="What it does" />
+              <div class="field-error" id="error-command-description-${idx}" data-error-for="cmd-desc-${idx}"></div>
             </div>
             <div>
               <label class="block text-xs font-medium text-gray-300 mb-1">Usage Hint</label>
-              <input type="text" class="field-input font-mono" data-cmd-field="usageHint" data-idx="${idx}" placeholder="[username]" />
+              <input type="text" class="field-input font-mono" data-cmd-field="usageHint" data-idx="${idx}" aria-label="Command ${idx + 1} usage hint" placeholder="[username]" />
             </div>
             <div class="flex items-end gap-3">
               <label class="inline-flex items-center gap-2 text-xs text-gray-300">
-                <input type="checkbox" data-cmd-field="shouldEscape" data-idx="${idx}" class="accent-indigo-500" />
+                <input type="checkbox" data-cmd-field="shouldEscape" data-idx="${idx}" class="accent-indigo-500" aria-label="Command ${idx + 1} should escape" />
                 Should Escape
               </label>
               <button type="button" class="btn btn-danger-ghost ml-auto" data-cmd-remove="${idx}">Remove</button>
@@ -1026,8 +1180,7 @@
       container.querySelectorAll("[data-cmd-remove]").forEach(btn => {
         btn.addEventListener("click", () => {
           const idx = Number(btn.getAttribute("data-cmd-remove"));
-          state.slashCommands.splice(idx, 1);
-          updateState("slashCommands", state.slashCommands);
+          updateState("slashCommands", removeAtIndex(state.slashCommands, idx));
           renderSlashCommands();
         });
       });
@@ -1037,33 +1190,22 @@
       const idx = Number(ev.target.getAttribute("data-idx"));
       const field = ev.target.getAttribute("data-cmd-field");
       const value = field === "shouldEscape" ? ev.target.checked : ev.target.value;
-      state.slashCommands[idx][field] = value;
-      updateState("slashCommands", state.slashCommands, { debounce: field !== "shouldEscape" });
+      updateState(`slashCommands.${idx}.${field}`, value, { debounce: field !== "shouldEscape" });
     }
 
     function onCommandFieldBlur(ev) {
       const idx = Number(ev.target.getAttribute("data-idx"));
       const field = ev.target.getAttribute("data-cmd-field");
       const cmd = state.slashCommands[idx];
-      if (field === "command") {
-        const errEl = ev.target.parentElement.querySelector(".field-error");
-        if (cmd.command && !cmd.command.startsWith("/")) {
-          ev.target.classList.add("is-invalid");
-          errEl.textContent = STRINGS.ERR_COMMAND_SLASH;
-        } else {
-          ev.target.classList.remove("is-invalid");
-          errEl.textContent = "";
-        }
-      } else if (field === "description") {
-        const errEl = ev.target.parentElement.querySelector(".field-error");
-        if (!cmd.description) {
-          ev.target.classList.add("is-invalid");
-          errEl.textContent = STRINGS.ERR_REQUIRED;
-        } else {
-          ev.target.classList.remove("is-invalid");
-          errEl.textContent = "";
-        }
+      if (field !== "command" && field !== "description") return;
+      const errEl = ev.target.parentElement.querySelector(".field-error");
+      let message = "";
+      if (field === "command" && cmd.command && !cmd.command.startsWith("/")) {
+        message = STRINGS.ERR_COMMAND_SLASH;
+      } else if (field === "description" && !cmd.description.trim()) {
+        message = STRINGS.ERR_REQUIRED;
       }
+      setFieldValidation(ev.target, errEl, message);
     }
 
     /* ---------- Shortcuts ---------- */
@@ -1084,22 +1226,22 @@
           <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
               <label class="block text-xs font-medium text-gray-300 mb-1">Name</label>
-              <input type="text" class="field-input" data-sc-field="name" data-idx="${idx}" placeholder="Open dialog" />
-              <div class="field-error"></div>
+              <input type="text" class="field-input" data-sc-field="name" data-idx="${idx}" aria-label="Shortcut ${idx + 1} name" aria-describedby="error-shortcut-name-${idx}" placeholder="Open dialog" />
+              <div class="field-error" id="error-shortcut-name-${idx}"></div>
             </div>
             <div>
               <label class="block text-xs font-medium text-gray-300 mb-1">Callback ID</label>
-              <input type="text" class="field-input font-mono" data-sc-field="callbackId" data-idx="${idx}" placeholder="open_dialog" />
-              <div class="field-error"></div>
+              <input type="text" class="field-input font-mono" data-sc-field="callbackId" data-idx="${idx}" aria-label="Shortcut ${idx + 1} callback ID" aria-describedby="error-shortcut-callback-${idx}" placeholder="open_dialog" />
+              <div class="field-error" id="error-shortcut-callback-${idx}"></div>
             </div>
             <div class="md:col-span-2">
               <label class="block text-xs font-medium text-gray-300 mb-1">Description</label>
-              <input type="text" class="field-input" data-sc-field="description" data-idx="${idx}" placeholder="What this shortcut does" />
-              <div class="field-error"></div>
+              <input type="text" class="field-input" data-sc-field="description" data-idx="${idx}" aria-label="Shortcut ${idx + 1} description" aria-describedby="error-shortcut-description-${idx}" placeholder="What this shortcut does" />
+              <div class="field-error" id="error-shortcut-description-${idx}"></div>
             </div>
             <div>
               <label class="block text-xs font-medium text-gray-300 mb-1">Type</label>
-              <select class="field-select" data-sc-field="type" data-idx="${idx}">
+              <select class="field-select" data-sc-field="type" data-idx="${idx}" aria-label="Shortcut ${idx + 1} type">
                 <option value="global">global</option>
                 <option value="message">message</option>
               </select>
@@ -1128,8 +1270,7 @@
       container.querySelectorAll("[data-sc-remove]").forEach(btn => {
         btn.addEventListener("click", () => {
           const idx = Number(btn.getAttribute("data-sc-remove"));
-          state.shortcuts.splice(idx, 1);
-          updateState("shortcuts", state.shortcuts);
+          updateState("shortcuts", removeAtIndex(state.shortcuts, idx));
           renderShortcuts();
         });
       });
@@ -1138,9 +1279,8 @@
     function onShortcutFieldChange(ev) {
       const idx = Number(ev.target.getAttribute("data-idx"));
       const field = ev.target.getAttribute("data-sc-field");
-      state.shortcuts[idx][field] = ev.target.value;
       const debounce = ev.target.tagName.toLowerCase() !== "select";
-      updateState("shortcuts", state.shortcuts, { debounce });
+      updateState(`shortcuts.${idx}.${field}`, ev.target.value, { debounce });
     }
 
     function onShortcutFieldBlur(ev) {
@@ -1148,16 +1288,13 @@
       const field = ev.target.getAttribute("data-sc-field");
       const sc = state.shortcuts[idx];
       const errEl = ev.target.parentElement.querySelector(".field-error");
+      let message = "";
       if (field === "callbackId" && sc.callbackId && !CALLBACK_ID_RE.test(sc.callbackId)) {
-        ev.target.classList.add("is-invalid");
-        errEl.textContent = STRINGS.ERR_CALLBACK_ID;
-      } else if (["name", "callbackId", "description"].indexOf(field) !== -1 && !sc[field]) {
-        ev.target.classList.add("is-invalid");
-        errEl.textContent = STRINGS.ERR_REQUIRED;
-      } else {
-        ev.target.classList.remove("is-invalid");
-        errEl.textContent = "";
+        message = STRINGS.ERR_CALLBACK_ID;
+      } else if (["name", "callbackId", "description"].includes(field) && !sc[field].trim()) {
+        message = STRINGS.ERR_REQUIRED;
       }
+      setFieldValidation(ev.target, errEl, message);
     }
 
     /* ---------- Interactivity ---------- */
@@ -1169,7 +1306,7 @@
             <div class="text-sm text-gray-200">Enable Interactivity</div>
             <div class="text-xs text-gray-500">Receive interactive component payloads at a URL.</div>
           </div>
-          <button type="button" class="toggle ${state.interactivity.enabled ? "is-on" : ""}" id="toggle-interactivity" aria-pressed="${state.interactivity.enabled}"></button>
+          <button type="button" class="toggle ${state.interactivity.enabled ? "is-on" : ""}" id="toggle-interactivity" aria-label="Enable Interactivity" aria-pressed="${state.interactivity.enabled}"></button>
         </div>
         <div id="interactivity-fields" class="space-y-3 ${state.interactivity.enabled ? "" : "hidden"}">
           <div>
@@ -1197,81 +1334,72 @@
         updateState("interactivity.requestUrl", ev.target.value, { debounce: true });
       });
       document.getElementById("input-interactivity-url").addEventListener("blur", (ev) => {
-        const val = ev.target.value.trim();
+        const val = ev.target.value;
         const errEl = document.getElementById("error-interactivity-url");
-        if (val && !HTTPS_URL_RE.test(val)) {
-          ev.target.classList.add("is-invalid");
-          errEl.textContent = STRINGS.ERR_HTTPS;
-        } else {
-          ev.target.classList.remove("is-invalid");
-          errEl.textContent = "";
-        }
+        const message = val && !isValidHttpsUrl(val) ? STRINGS.ERR_HTTPS : "";
+        setFieldValidation(ev.target, errEl, message);
       });
       document.getElementById("input-menu-options-url").addEventListener("input", (ev) => {
         updateState("interactivity.messageMenuOptionsUrl", ev.target.value, { debounce: true });
       });
       document.getElementById("input-menu-options-url").addEventListener("blur", (ev) => {
-        const val = ev.target.value.trim();
+        const val = ev.target.value;
         const errEl = document.getElementById("error-menu-options-url");
-        if (val && !HTTPS_URL_RE.test(val)) {
-          ev.target.classList.add("is-invalid");
-          errEl.textContent = STRINGS.ERR_HTTPS;
-        } else {
-          ev.target.classList.remove("is-invalid");
-          errEl.textContent = "";
-        }
+        const message = val && !isValidHttpsUrl(val) ? STRINGS.ERR_HTTPS : "";
+        setFieldValidation(ev.target, errEl, message);
       });
     }
 
     /* =========================================================================
      * VALIDATION HELPERS
      * ========================================================================= */
-    /**
-     * Validate a single named field. Sets error text and invalid styling on the
-     * matching DOM element. Validation never blocks YAML generation.
-     */
-    function validateField(name) {
-      switch (name) {
-        case "appName": {
-          const input = document.getElementById("input-app-name");
-          const errEl = document.getElementById("error-app-name");
-          if (!state.appName) {
-            input.classList.add("is-invalid");
-            errEl.textContent = STRINGS.ERR_REQUIRED;
-          } else {
-            input.classList.remove("is-invalid");
-            errEl.textContent = "";
-          }
-          break;
-        }
-        case "backgroundColor": {
-          const input = document.getElementById("input-bg-color-hex");
-          const errEl = document.getElementById("error-bg-color");
-          if (!HEX_COLOR_RE.test(state.backgroundColor)) {
-            input.classList.add("is-invalid");
-            errEl.textContent = STRINGS.ERR_HEX;
-          } else {
-            input.classList.remove("is-invalid");
-            errEl.textContent = "";
-          }
-          break;
-        }
-        case "eventUrl": {
-          const input = document.getElementById("input-event-url");
-          const errEl = document.getElementById("error-event-url");
-          const val = state.eventSubscriptions.requestUrl;
-          if (val && !HTTPS_URL_RE.test(val)) {
-            input.classList.add("is-invalid");
-            errEl.textContent = STRINGS.ERR_HTTPS;
-          } else {
-            input.classList.remove("is-invalid");
-            errEl.textContent = "";
-          }
-          break;
-        }
-        default:
-          break;
+    function setFieldValidation(input, error, message) {
+      const isInvalid = Boolean(message);
+      input.classList.toggle("is-invalid", isInvalid);
+      input.setAttribute("aria-invalid", String(isInvalid));
+      error.textContent = message;
+    }
+
+    function isValidHttpsUrl(value) {
+      if (typeof value !== "string" || !value || value.trim() !== value) return false;
+      try {
+        const url = new URL(value);
+        return url.protocol === "https:" && Boolean(url.hostname);
+      } catch (err) {
+        return false;
       }
+    }
+
+    /** Validate a field without blocking generation of an in-progress manifest. */
+    function validateField(name) {
+      let input;
+      let error;
+      let message = "";
+
+      switch (name) {
+        case "appName":
+          input = document.getElementById("input-app-name");
+          error = document.getElementById("error-app-name");
+          if (!state.appName.trim()) message = STRINGS.ERR_REQUIRED;
+          break;
+        case "backgroundColor":
+          input = document.getElementById("input-bg-color-hex");
+          error = document.getElementById("error-bg-color");
+          if (!HEX_COLOR_RE.test(state.backgroundColor)) message = STRINGS.ERR_HEX;
+          break;
+        case "eventUrl":
+          input = document.getElementById("input-event-url");
+          error = document.getElementById("error-event-url");
+          if (state.eventSubscriptions.requestUrl &&
+              !isValidHttpsUrl(state.eventSubscriptions.requestUrl)) {
+            message = STRINGS.ERR_HTTPS;
+          }
+          break;
+        default:
+          return;
+      }
+
+      setFieldValidation(input, error, message);
     }
 
     /* =========================================================================
@@ -1324,8 +1452,10 @@
 
       // Slash commands
       document.getElementById("btn-add-command").addEventListener("click", () => {
-        state.slashCommands.push({ command: "/", description: "", usageHint: "", shouldEscape: false });
-        updateState("slashCommands", state.slashCommands);
+        updateState("slashCommands", [
+          ...state.slashCommands,
+          { command: "/", description: "", usageHint: "", shouldEscape: false }
+        ]);
         renderSlashCommands();
       });
 
@@ -1346,8 +1476,10 @@
 
       // Shortcuts
       document.getElementById("btn-add-shortcut").addEventListener("click", () => {
-        state.shortcuts.push({ name: "", callbackId: "", description: "", type: "global" });
-        updateState("shortcuts", state.shortcuts);
+        updateState("shortcuts", [
+          ...state.shortcuts,
+          { name: "", callbackId: "", description: "", type: "global" }
+        ]);
         renderShortcuts();
       });
 
@@ -1360,15 +1492,19 @@
       document.getElementById("btn-import-close").addEventListener("click", closeImportModal);
       document.getElementById("btn-import-cancel").addEventListener("click", closeImportModal);
       document.getElementById("btn-import-confirm").addEventListener("click", confirmImport);
+      const importModal = document.getElementById("import-modal");
+      importModal.addEventListener("keydown", handleImportModalKeydown);
+      importModal.addEventListener("click", (event) => {
+        if (event.target === importModal) closeImportModal();
+      });
 
       // Reset
       document.getElementById("btn-reset").addEventListener("click", () => {
-        if (window.confirm(STRINGS.RESET_CONFIRM)) {
-          localStorage.removeItem(STORAGE_KEY);
-          state = initState();
-          renderForm();
-          renderYAML();
-        }
+        if (!window.confirm(STRINGS.RESET_CONFIRM)) return;
+        clearPersistedState();
+        state = initState();
+        renderForm();
+        scheduleRender(false);
       });
     }
 
@@ -1376,55 +1512,108 @@
      * COPY / DOWNLOAD / IMPORT
      * ========================================================================= */
     /** Copy the current YAML output to the clipboard. */
-    function copyToClipboard() {
-      const text = outputCodeEl().innerText;
-      const finish = () => {
-        const badge = document.getElementById("copied-badge");
-        badge.classList.add("is-visible");
-        setTimeout(() => badge.classList.remove("is-visible"), 1500);
-      };
+    async function copyToClipboard() {
+      flushPendingRender();
+      let copied = false;
 
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(text).then(finish).catch(() => fallbackCopy(text, finish));
-      } else {
-        fallbackCopy(text, finish);
+      if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+        try {
+          await navigator.clipboard.writeText(currentOutput);
+          copied = true;
+        } catch (err) {
+          // Permission failures can still succeed through the legacy fallback.
+        }
       }
+
+      if (!copied) copied = fallbackCopy(currentOutput);
+      showCopyStatus(copied);
     }
 
-    function fallbackCopy(text, done) {
-      const ta = document.createElement("textarea");
-      ta.value = text;
-      ta.style.position = "fixed";
-      ta.style.left = "-9999px";
-      document.body.appendChild(ta);
-      ta.select();
-      try { document.execCommand("copy"); } catch (e) { /* ignore */ }
-      document.body.removeChild(ta);
-      done();
+    function fallbackCopy(text) {
+      const activeElement = document.activeElement;
+      const textarea = document.createElement("textarea");
+      textarea.value = text;
+      textarea.readOnly = true;
+      textarea.setAttribute("aria-hidden", "true");
+      textarea.style.position = "fixed";
+      textarea.style.left = "-9999px";
+      document.body.appendChild(textarea);
+      textarea.select();
+
+      let copied = false;
+      try {
+        copied = document.execCommand("copy") === true;
+      } catch (err) {
+        copied = false;
+      } finally {
+        textarea.remove();
+        if (activeElement && typeof activeElement.focus === "function") activeElement.focus();
+      }
+      return copied;
+    }
+
+    function showCopyStatus(copied) {
+      const badge = document.getElementById("copied-badge");
+      if (copyBadgeTimer !== null) clearTimeout(copyBadgeTimer);
+      badge.textContent = copied ? STRINGS.COPY_SUCCESS : STRINGS.COPY_FAILURE;
+      badge.classList.toggle("is-error", !copied);
+      badge.classList.add("is-visible");
+      copyBadgeTimer = setTimeout(() => {
+        badge.classList.remove("is-visible");
+        copyBadgeTimer = null;
+      }, 1500);
     }
 
     /** Trigger a download of the current YAML as manifest.yaml. */
     function downloadYAML() {
-      const text = outputCodeEl().innerText;
-      const blob = new Blob([text], { type: "application/x-yaml;charset=utf-8" });
+      flushPendingRender();
+      const blob = new Blob([currentOutput], { type: "application/x-yaml;charset=utf-8" });
       const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "manifest.yaml";
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = "manifest.yaml";
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
     }
 
     function openImportModal() {
+      importModalTrigger = document.activeElement;
       document.getElementById("import-error").textContent = "";
-      document.getElementById("import-textarea").value = "";
+      const textarea = document.getElementById("import-textarea");
+      textarea.value = "";
       document.getElementById("import-modal").classList.remove("hidden");
+      textarea.focus();
     }
 
     function closeImportModal() {
       document.getElementById("import-modal").classList.add("hidden");
+      if (importModalTrigger && typeof importModalTrigger.focus === "function") {
+        importModalTrigger.focus();
+      }
+      importModalTrigger = null;
+    }
+
+    function handleImportModalKeydown(event) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeImportModal();
+        return;
+      }
+      if (event.key !== "Tab") return;
+
+      const modal = document.getElementById("import-modal");
+      const controls = Array.from(modal.querySelectorAll("button, textarea"));
+      const first = controls[0];
+      const last = controls[controls.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
     }
 
     /** Parse the pasted YAML, validate, and replace state. */
@@ -1437,7 +1626,7 @@
         errEl.textContent = STRINGS.IMPORT_EMPTY;
         return;
       }
-      if (typeof window.jsyaml === "undefined" || !window.jsyaml || typeof window.jsyaml.load !== "function") {
+      if (!isYamlLibraryAvailable()) {
         errEl.textContent = STRINGS.IMPORT_PARSE_ERROR + "js-yaml library is unavailable.";
         return;
       }
@@ -1446,11 +1635,11 @@
       try {
         parsed = window.jsyaml.load(text);
       } catch (err) {
-        errEl.textContent = STRINGS.IMPORT_PARSE_ERROR + (err && err.message ? err.message : String(err));
+        errEl.textContent = STRINGS.IMPORT_PARSE_ERROR + getErrorMessage(err);
         return;
       }
 
-      if (!parsed || typeof parsed !== "object") {
+      if (!isRecord(parsed)) {
         errEl.textContent = STRINGS.IMPORT_INVALID_STRUCTURE;
         return;
       }
@@ -1466,7 +1655,7 @@
      */
     function importYAML(parsed) {
       const next = initState();
-      const di = parsed.display_information || {};
+      const di = asRecord(parsed.display_information);
       if (typeof di.name === "string") next.appName = di.name.slice(0, 35);
       if (typeof di.description === "string") next.shortDescription = di.description.slice(0, 140);
       if (typeof di.long_description === "string") next.longDescription = di.long_description;
@@ -1474,67 +1663,80 @@
         next.backgroundColor = di.background_color;
       }
 
-      const features = parsed.features || {};
-      const home = features.app_home || {};
-      next.toggles.messagesTabEnabled = Boolean(home.messages_tab_enabled);
-      next.toggles.messagesTabReadOnly = Boolean(home.messages_tab_read_only_enabled);
-      next.toggles.incomingWebhooks = Boolean(features.incoming_webhooks);
+      const features = asRecord(parsed.features);
+      const home = asRecord(features.app_home);
+      next.toggles.messagesTabEnabled = home.messages_tab_enabled === true;
+      next.toggles.messagesTabReadOnly = home.messages_tab_read_only_enabled === true;
+      next.toggles.incomingWebhooks = features.incoming_webhooks === true;
 
       if (Array.isArray(features.slash_commands)) {
-        next.slashCommands = features.slash_commands.map((c) => ({
-          command: typeof c.command === "string" ? c.command : "",
-          description: typeof c.description === "string" ? c.description : "",
-          usageHint: typeof c.usage_hint === "string" ? c.usage_hint : "",
-          shouldEscape: Boolean(c.should_escape)
-        }));
+        next.slashCommands = features.slash_commands.map((value) => {
+          const command = asRecord(value);
+          return {
+            command: stringOrDefault(command.command),
+            description: stringOrDefault(command.description),
+            usageHint: stringOrDefault(command.usage_hint),
+            shouldEscape: command.should_escape === true
+          };
+        });
       }
       if (Array.isArray(features.shortcuts)) {
-        next.shortcuts = features.shortcuts.map((s) => ({
-          name: typeof s.name === "string" ? s.name : "",
-          callbackId: typeof s.callback_id === "string" ? s.callback_id : "",
-          description: typeof s.description === "string" ? s.description : "",
-          type: s.type === "message" ? "message" : "global"
-        }));
+        next.shortcuts = features.shortcuts.map((value) => {
+          const shortcut = asRecord(value);
+          return {
+            name: stringOrDefault(shortcut.name),
+            callbackId: stringOrDefault(shortcut.callback_id),
+            description: stringOrDefault(shortcut.description),
+            type: shortcut.type === "message" ? "message" : "global"
+          };
+        });
       }
 
-      const oauth = parsed.oauth_config || {};
-      const scopes = oauth.scopes || {};
+      const oauth = asRecord(parsed.oauth_config);
+      const scopes = asRecord(oauth.scopes);
       if (Array.isArray(scopes.bot)) {
-        next.botScopes = scopes.bot.filter((v) => typeof v === "string" && v !== "incoming-webhook");
-        if (scopes.bot.indexOf("incoming-webhook") !== -1) next.toggles.incomingWebhooks = true;
+        const botScopes = normalizeStringList(scopes.bot);
+        next.botScopes = botScopes.filter((scope) => scope !== "incoming-webhook");
+        if (botScopes.includes("incoming-webhook")) next.toggles.incomingWebhooks = true;
       }
       if (Array.isArray(scopes.user)) {
-        next.userScopes = scopes.user.filter((v) => typeof v === "string");
+        next.userScopes = normalizeStringList(scopes.user);
       }
 
-      const settings = parsed.settings || {};
-      const eventSubs = settings.event_subscriptions || {};
+      const settings = asRecord(parsed.settings);
+      const eventSubs = asRecord(settings.event_subscriptions);
       if (typeof eventSubs.request_url === "string") next.eventSubscriptions.requestUrl = eventSubs.request_url;
-      if (Array.isArray(eventSubs.bot_events)) next.eventSubscriptions.botEvents = eventSubs.bot_events.filter(v => typeof v === "string");
-      if (Array.isArray(eventSubs.user_events)) next.eventSubscriptions.userEvents = eventSubs.user_events.filter(v => typeof v === "string");
+      next.eventSubscriptions.botEvents = normalizeStringList(eventSubs.bot_events);
+      next.eventSubscriptions.userEvents = normalizeStringList(eventSubs.user_events);
 
-      const inter = settings.interactivity || {};
-      if (inter.is_enabled) {
+      const inter = asRecord(settings.interactivity);
+      if (inter.is_enabled === true) {
         next.interactivity.enabled = true;
         if (typeof inter.request_url === "string") next.interactivity.requestUrl = inter.request_url;
         if (typeof inter.message_menu_options_url === "string") next.interactivity.messageMenuOptionsUrl = inter.message_menu_options_url;
       }
 
-      next.toggles.socketMode = Boolean(settings.socket_mode_enabled);
-      next.toggles.orgDeploy = Boolean(settings.org_deploy_enabled);
-      next.toggles.tokenRotation = Boolean(settings.token_rotation_enabled);
+      next.toggles.socketMode = settings.socket_mode_enabled === true;
+      next.toggles.orgDeploy = settings.org_deploy_enabled === true;
+      next.toggles.tokenRotation = settings.token_rotation_enabled === true;
 
       state = next;
       saveState();
       renderForm();
-      renderYAML();
+      scheduleRender(false);
     }
 
     /* =========================================================================
      * UTILITIES
      * ========================================================================= */
-    function escapeHTML(str) {
-      return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    function getErrorMessage(error) {
+      return error && typeof error.message === "string" ? error.message : String(error);
+    }
+
+    function isYamlLibraryAvailable() {
+      return Boolean(window.jsyaml) &&
+        typeof window.jsyaml.dump === "function" &&
+        typeof window.jsyaml.load === "function";
     }
 
     /* =========================================================================
@@ -1542,7 +1744,7 @@
      * ========================================================================= */
     function checkLibraryAvailable() {
       const banner = document.getElementById("library-warning");
-      if (typeof window.jsyaml === "undefined" || !window.jsyaml) {
+      if (!isYamlLibraryAvailable()) {
         banner.className = "banner-error mb-4";
         banner.textContent = STRINGS.LIBRARY_ERROR;
         banner.classList.remove("hidden");
