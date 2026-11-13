@@ -6,15 +6,12 @@ A single-file, zero-build, zero-backend tool that turns a guided form (app metad
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache--2.0-blue?style=for-the-badge)](LICENSE)
 [![Build Step: Zero Required](https://img.shields.io/badge/Build%20Step-Zero%20Required-4f46e5?style=for-the-badge)](#prerequisites)
-[![Runtime: Browser-Only](https://img.shields.io/badge/Runtime-Browser--Only%20ES2015%2B-0b0d12?style=for-the-badge)](#prerequisites)
-[![Runtime Dependencies: 2 CDN Scripts](https://img.shields.io/badge/Runtime%20Deps-2%20CDN%20Scripts-38bdf8?style=for-the-badge)](#runtime-dependencies)
+[![Runtime: Browser-Only](https://img.shields.io/badge/Runtime-Browser--Only-0b0d12?style=for-the-badge)](#prerequisites)
+[![Runtime Dependencies: 1 CDN Script](https://img.shields.io/badge/Runtime%20Deps-1%20CDN%20Script-38bdf8?style=for-the-badge)](#runtime-dependencies)
 [![Manifest Schema: major 1 - minor 1](https://img.shields.io/badge/Slack%20Manifest%20Schema-major%201%20%C2%B7%20minor%201-4A154B?style=for-the-badge&logo=slack&logoColor=white)](#manifest-schema-coverage)
 [![Tests: Manual Regression Matrix](https://img.shields.io/badge/Tests-Manual%20Regression%20Matrix-f59e0b?style=for-the-badge)](#manual-regression-matrix)
 [![Verification: Offline Smoke Checks](https://img.shields.io/badge/Verification-Offline%20Smoke%20Checks-0ea5e9?style=for-the-badge)](#static-analysis--smoke-checks)
 [![Contributions: Welcome](https://img.shields.io/badge/Contributions-Welcome-16a34a?style=for-the-badge)](#contributing)
-
-> [!NOTE]
-> **Positioning.** The upstream brief for this document was "a README for a logging library"; the artifact in this repository is the opposite end of the observability pipeline — a **manifest generator** that produces the declarative configuration of a Slack app. The two converge in practice: the generated `manifest.yaml` is the versioned, reviewable source of truth you commit next to your chat-ops and log-delivery code, so incident tooling, alert routing, and Slack app capabilities can never drift apart. Everything documented below is derived strictly from the shipped source code.
 
 ---
 
@@ -70,19 +67,20 @@ A single-file, zero-build, zero-backend tool that turns a guided form (app metad
 - **Dynamic repeaters** for slash commands and shortcuts with per-row **Add** / **Remove** controls and stable `data-*` field binding.
 - **Pill/tag input widgets** for bot scopes, user scopes, bot events, and user events, with **duplicate suppression** and keyboard-first entry (`Enter` commits the value).
 - **Unified toggle component** with an animated switch, `aria-pressed` state, and data-driven definitions (`TOGGLE_DEFS`) so new flags render uniformly with a label and help text.
+- **Keyboard and screen-reader support** — every control has an accessible name, labels are bound to their inputs, repeated rows carry their number in every name ("Command 2 description", "Remove shortcut 1"), validation errors set `aria-invalid` and are announced through live regions, and the import dialog is a native modal `<dialog>`: focus moves into it and back out, `Esc` or a click on the backdrop closes it, and the page behind it is inert. Transitions are switched off under `prefers-reduced-motion: reduce`.
 
 **Validation & guard-rails**
 
 - **Non-blocking validation** — errors are surfaced inline on `blur` and never prevent YAML generation, so users are never locked out of their own work.
-- **Format assertions**: hex color (`/^#([0-9a-fA-F]{6})$/`), HTTPS request URLs (`/^https:\/\/[^\s]+$/i`), slash-command prefix (`/`-prefixed), and callback ID charset (`/^[A-Za-z0-9_]+$/`).
+- **Format assertions**: hex color (`/^#[0-9a-fA-F]{6}$/`), HTTPS request URLs (parsed with `URL`: `https:` scheme, a host, no surrounding whitespace), slash-command prefix (`/`-prefixed), and callback ID charset (`/^[A-Za-z0-9_]+$/`). Required values must be more than whitespace. The colour and URL checks are the very predicates the manifest builder uses, so those fields are flagged exactly when their value is being left out of the output.
 - **Required-field guards** for app name, command description, and shortcut `name` / `callbackId` / `description`.
 - **Structural filters before serialization** — incomplete slash commands (`command` + `description` missing) and incomplete shortcuts (`name` + `callbackId` + `description` missing) are silently dropped instead of emitting schema-invalid YAML. Placeholder rows are never written to disk.
 
 **Output, export & interop**
 
 - **`js-yaml`-serialized YAML** with deterministic dump options (`noRefs: true`, `lineWidth: 120`, `quotingType: '"'`, `forceQuotes: false`).
-- **Dependency-free regex YAML highlighter** colouring keys, strings, booleans/numbers, `null`, list dashes, and comments — with correct `#`-in-string disambiguation.
-- **Clipboard export** via the async Clipboard API with a hidden-`<textarea>` + `document.execCommand("copy")` fallback for non-secure contexts, plus a transient "Copied" badge.
+- **Dependency-free YAML highlighter** colouring keys, strings (multi-line block scalars included), booleans/numbers, `null`, and list dashes. It is tailored to the block-style YAML that `js-yaml` emits and produces DOM text nodes rather than markup.
+- **Clipboard export** via the async Clipboard API with a hidden-`<textarea>` + `document.execCommand("copy")` fallback for non-secure contexts, plus a transient badge that reports the outcome: "Copied", or "Copy failed" when both paths were refused.
 - **File export** as `manifest.yaml` (`application/x-yaml;charset=utf-8`) through `Blob` + object-URL with automatic revocation.
 - **Round-trip YAML import** — paste an existing manifest into a modal and the whole form is repopulated, including re-derivation of the `incomingWebhooks` toggle from an `incoming-webhook` bot scope.
 - **JSON fallback path** — if `js-yaml` fails to load, output degrades to pretty-printed JSON with an explanatory banner instead of a blank panel.
@@ -94,8 +92,8 @@ A single-file, zero-build, zero-backend tool that turns a guided form (app metad
 - **Forward-compatible rehydration** — `mergeWithDefaults()` reconstructs state field-by-field, so a partial, stale, or hand-edited persisted payload cannot crash the app or poison the form with wrong-typed values.
 - **Graceful degradation everywhere** — persistence, clipboard, and YAML serialization are each individually wrapped with `try` / `catch`; private-mode or quota-exceeded storage is silently tolerated.
 - **Reset-to-defaults** with a confirmation prompt that clears persisted state and restores the pristine baseline.
-- **XSS-safe rendering** — every user-supplied value interpolated into a markup template passes through `escapeHTML()` before DOM insertion; field values are assigned through `.value` (never parsed as markup). Audited by the [interpolation check](#static-analysis--smoke-checks).
-- **Zero infrastructure** — no build step, no bundler, no backend, no telemetry, no network calls other than two CDN scripts. The generated manifest never leaves the client.
+- **XSS-safe rendering** — the script never turns a string into markup: repeated rows, pills, and toggles are cloned from `<template>` elements and filled through `textContent` and `.value`, and the highlighter emits text nodes. Stored snapshots and imported manifests are additionally type-checked field by field, and the document carries a restrictive `Content-Security-Policy` (scripts only from itself and cdnjs, no connections, no objects, no form targets) as a second line of defence. Audited by the [markup-sink check](#static-analysis--smoke-checks).
+- **Zero infrastructure** — no build step, no bundler, no backend, no telemetry, no network calls other than one CDN script. The generated manifest never leaves the client.
 
 ---
 
@@ -105,11 +103,10 @@ A single-file, zero-build, zero-backend tool that turns a guided form (app metad
 
 | Layer | Technology | Role in the project |
 | :--- | :--- | :--- |
-| Markup | HTML5 (single document, `index.html`, 1,567 lines) | Entire application shell — form, output panel, import modal |
-| Styling | Tailwind CSS via the Play CDN (`https://cdn.tailwindcss.com`) | Utility classes for layout (`max-w-7xl`, `grid`, `lg:grid-cols-2`, `space-y-*`) and state variants |
-| Styling (custom) | Hand-written CSS in a single `<style>` block | Design tokens (`:root { color-scheme: dark }`), `.section-card`, `.field-*`, `.btn-*`, `.tag-pill`, `.toggle`, `.output-pre`, YAML token colours, custom scrollbars, sticky output column |
-| Serialization | js-yaml 4.1.0 (cdnjs, SRI-pinned) | `jsyaml.dump()` for generation and `jsyaml.load()` for import |
-| Application logic | Vanilla JavaScript (ES2015+), `"use strict"`, single inline `<script>` | State container, manifest builder, validation, DOM rendering, persistence, export |
+| Markup | HTML5 (single document, `index.html`, ≈1,850 lines) | Entire application shell — form, output panel, a native `<dialog>` for import, and four `<template>` elements for the repeated rows (toggle, tag pill, slash command, shortcut) |
+| Styling | Hand-written CSS in a single `<style>` block (≈480 lines), no framework | Design tokens as custom properties (`:root { color-scheme: dark; --bg: …; --accent: … }`), a small reset, layout (`.container`, `.layout`, `.stack*`), components (`.section-card`, `.field-*`, `.btn-*`, `.tag-pill`, `.toggle`, `.repeater-*`, `.output-pre`, `.modal-*`), YAML token colours, custom scrollbars, sticky output panel |
+| Serialization | js-yaml 4.1.1 (cdnjs, SRI-pinned) | `jsyaml.dump()` for generation and `jsyaml.load()` for import |
+| Application logic | Vanilla JavaScript, `"use strict"`, single classic inline `<script>` (≈1,050 lines) | State container, manifest builder, validation, DOM rendering, persistence, export |
 | Icons | Inline SVG (24×24, `stroke="currentColor"`) | Import, Reset, Copy, and Download glyphs — no icon font or sprite dependency |
 | Persistence | Web Storage API (`localStorage`) | Versioned workspace snapshot |
 | Export | Blob / object URL, async Clipboard API | `manifest.yaml` download and copy-to-clipboard |
@@ -119,15 +116,14 @@ A single-file, zero-build, zero-backend tool that turns a guided form (app metad
 
 ### Runtime Dependencies
 
-Both dependencies are loaded from public CDNs at runtime — **there is no `package.json`, lockfile, or `node_modules/`**.
+The single runtime dependency is loaded from a public CDN — **there is no `package.json`, lockfile, or `node_modules/`**. All styling ships inside `index.html`.
 
 | Dependency | Version | Delivery | Integrity |
 | :--- | :--- | :--- | :--- |
-| Tailwind CSS | Play CDN (floating) | `<script src="https://cdn.tailwindcss.com">` | Not pinned |
-| js-yaml | 4.1.0 | `https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js` | Subresource Integrity hash `sha512-CSBhVREy…WfWg==` with `crossorigin="anonymous"` and `referrerpolicy="no-referrer"` |
+| js-yaml | 4.1.1 | `https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.1/js-yaml.min.js` | Subresource Integrity hash `sha512-Ccva9tZj…YaNA==` with `crossorigin="anonymous"` and `referrerpolicy="no-referrer"` |
 
 > [!IMPORTANT]
-> Tailwind's Play CDN is a **development-oriented** distribution that compiles utilities in the browser at load time. It is ideal for a zero-build tool like this one, but for locked-down or offline deployments you should replace it with a precompiled Tailwind stylesheet and self-host `js-yaml` (see [Offline / air-gapped deployment](#offline--air-gapped-deployment)).
+> The `integrity` value must match the exact bytes cdnjs serves for the pinned version. Whenever you change the version, recompute the hash (the command is under [Offline / air-gapped deployment](#offline--air-gapped-deployment)): on a mismatch the browser refuses the script and the app drops to its JSON fallback. For locked-down or offline deployments, self-host the file instead.
 
 ### Project Structure
 
@@ -143,62 +139,54 @@ slack-app-manifest-generator/
 │   ├── config
 │   └── …                          # Git metadata (remote: OstinUA/slack-app-manifest-generator)
 ├── LICENSE                        # Apache License 2.0, January 2004 (11,357 bytes)
-├── index.html                     # ⚙️ The entire application (1,567 lines)
+├── index.html                     # ⚙️ The entire application (≈1,850 lines)
 │   ├── <head>
 │   │   ├── <meta charset>         # UTF-8 encoding
 │   │   ├── <meta viewport>        # width=device-width, initial-scale=1.0
 │   │   ├── <title>                # "Slack App Manifest Generator"
-│   │   ├── <script> tailwindcss   # Tailwind Play CDN
-│   │   ├── <script> js-yaml@4.1.0 # SRI-pinned YAML engine
-│   │   └── <style>                # ≈250 lines: tokens, components, YAML theme
-│   ├── <body>
-│   │   ├── <header>               # Title, subtitle, "Import YAML" + "Reset to Defaults"
-│   │   ├── #library-warning       # Banner shown when js-yaml is unavailable
-│   │   └── <main>                 # Two-column responsive grid
-│   │       ├── #form-column       # LEFT: authoring surface
-│   │       │   ├── Basic Information      → App Name, Short/Long Description, Background Color
-│   │       │   ├── Features & Settings    → #toggles-container (6 toggles)
-│   │       │   ├── OAuth Scopes           → #bot-scopes-tags, #user-scopes-tags
-│   │       │   ├── Slash Commands         → #commands-container (repeater)
-│   │       │   ├── Event Subscriptions    → #input-event-url, #bot-events-tags, #user-events-tags
-│   │       │   ├── Shortcuts              → #shortcuts-container (repeater)
-│   │       │   └── Interactivity          → #interactivity-container
-│   │       └── .output-sticky     # RIGHT: sticky preview
-│   │           ├── #output-error  # Dump-error banner (hidden by default)
-│   │           └── #output-code   # Highlighted YAML / JSON fallback
-│   ├── #import-modal              # Paste-and-import dialog (role="dialog", aria-modal="true")
-│   └── <script>                   # ≈1,100 lines: the application itself
-│       ├── CONSTANTS              # STRINGS, STORAGE_KEY, DEBOUNCE_MS, regexes, TOGGLE_DEFS
-│       ├── STATE                  # `state` singleton + `initState()`
-│       ├── PERSISTENCE            # saveState / loadState / mergeWithDefaults / normalizers
-│       ├── STATE UPDATE           # updateState(path, value, { debounce })
-│       ├── MANIFEST BUILDER       # buildManifestObject()
-│       ├── YAML RENDER            # renderYAML() + highlightYAML()
-│       ├── RENDER FORM            # renderForm, renderToggles, renderTags, repeaters
-│       ├── VALIDATION HELPERS     # validateField(name) + per-field blur handlers
-│       ├── EVENT WIRING           # attachEventListeners()
-│       ├── COPY / DOWNLOAD / IMPORT
-│       ├── UTILITIES              # escapeHTML()
-│       └── STARTUP                # checkLibraryAvailable() + boot()
+│   │   ├── <script> js-yaml@4.1.1 # SRI-pinned YAML engine — the only external resource
+│   │   └── <style>                # ≈480 lines: tokens, reset, layout, components, YAML theme
+│   └── <body>
+│       ├── <header>               # Title, subtitle, "Import YAML" + "Reset to Defaults"
+│       ├── <main>
+│       │   ├── #library-warning   # Banner shown when js-yaml is unavailable
+│       │   └── .layout            # Two-column responsive grid
+│       │       ├── #form-column   # LEFT: authoring surface
+│       │       │   ├── Basic Information      → App Name, Short/Long Description, Background Color
+│       │       │   ├── Features & Settings    → #toggles-container (6 toggles)
+│       │       │   ├── OAuth Scopes           → #bot-scopes-tags, #user-scopes-tags
+│       │       │   ├── Slash Commands         → #commands-container (repeater)
+│       │       │   ├── Event Subscriptions    → #input-event-url, #bot-events-tags, #user-events-tags
+│       │       │   ├── Shortcuts              → #shortcuts-container (repeater)
+│       │       │   └── Interactivity          → #interactivity-container
+│       │       └── .output-panel  # RIGHT: sticky preview
+│       │           ├── #output-error  # Dump-error banner (hidden by default)
+│       │           └── #output-code   # Highlighted YAML / JSON fallback
+│       ├── <dialog id="import-modal">  # Paste-and-import dialog (native modal)
+│       ├── <template> × 4         # #tpl-toggle, #tpl-tag, #tpl-command, #tpl-shortcut
+│       └── <script>               # ≈1,050 lines: the application itself
+│           ├── Configuration      # STORAGE_KEY, DEBOUNCE_MS, limits, regexes, YAML_DUMP_OPTIONS, STRINGS, TOGGLE_DEFS
+│           ├── Validation rules   # isHexColor / isHttpsUrl + the check*() rules
+│           ├── DOM references     # byId(), dom, TEXT_FIELDS, TAG_FIELDS, REPEATERS
+│           ├── State              # `state` + initState(), normalizers, mergeWithDefaults()
+│           ├── Persistence        # saveState / loadState / clearSavedState
+│           ├── State access       # resolvePath, readState, updateState(path, value, { debounce }), replaceState
+│           ├── Manifest           # buildManifestObject()
+│           ├── Output             # getYamlLibrary(), renderYAML(), highlightYAML()
+│           ├── Form rendering     # renderForm, renderToggles, renderTags, renderRepeater
+│           ├── Validation         # setFieldError(), validate()
+│           ├── Event handlers     # attachEventListeners() and its helpers
+│           ├── Copy and download  # copyToClipboard, fallbackCopy, downloadYAML
+│           ├── Import             # dialog open/close, parseManifest(), importYAML()
+│           └── Startup            # checkLibraryAvailable() + boot()
 └── README.md                      # This document
 ```
 
-**Line-number index of the script's section banners** (handy for reviewers and contributors):
+**Section banners of the script** (handy for reviewers and contributors). Each section opens with a `// -- Name ---` comment. Line numbers move with every edit, so print the current index rather than trusting a table:
 
-| Section | Line |
-| :--- | ---: |
-| `CONSTANTS` | 467 |
-| `STATE` | 507 |
-| `PERSISTENCE` | 551 |
-| `STATE UPDATE` | 619 |
-| `MANIFEST BUILDER` | 649 |
-| `YAML RENDER` | 758 |
-| `RENDER FORM` | 845 |
-| `VALIDATION HELPERS` | 1227 |
-| `EVENT WIRING` | 1277 |
-| `COPY / DOWNLOAD / IMPORT` | 1375 |
-| `UTILITIES` | 1533 |
-| `STARTUP` | 1540 |
+```bash
+grep -n '^    // -- ' index.html
+```
 
 </details>
 
@@ -206,16 +194,17 @@ slack-app-manifest-generator/
 
 | # | Decision | Rationale | Consequence / trade-off |
 | :-: | :--- | :--- | :--- |
-| 1 | **Single-file application** | Maximises portability: open `index.html`, deploy to any static host, attach to a PR as an artifact, or email it. No toolchain drift, no dependency CVEs beyond the two CDN scripts. | Contributors edit one long file; reviewers navigate by the section banners and line index. |
-| 2 | **No build step** | The artifact served is the artifact committed. `git clone` → open → done, with zero minute-one friction. | Tailwind's Play CDN compiles utilities client-side; production-grade caching and purging require opting into a precompiled stylesheet. |
-| 3 | **State as the single source of truth** | `state` is a plain object; every read/write flows through `updateState(path, value)`, which persists to `localStorage` and re-renders. There is no DOM-as-database pattern. | One predictable mutation funnel makes persistence and rendering impossible to forget — but DOM nodes are not diffed, so list editors re-render their container wholesale. |
+| 1 | **Single-file application** | Maximises portability: open `index.html`, deploy to any static host, attach to a PR as an artifact, or email it. No toolchain drift, no dependency CVEs beyond the one CDN script. | Contributors edit one long file; reviewers navigate by the section banners. |
+| 2 | **No build step, no CSS framework** | The artifact served is the artifact committed. `git clone` → open → done, with zero minute-one friction. Styles are plain CSS in the same file, so nothing is compiled in the browser either. | Every component class is hand-written and maintained here; there is no utility layer to reach for when restyling. |
+| 3 | **State as the single source of truth** | `state` is a plain object; every edit flows through `updateState(path, value)`, which persists to `localStorage` and re-renders the output, and whole-state swaps (startup, reset, import) go through `replaceState()`. A path must already exist, so a typo throws instead of growing the tree. There is no DOM-as-database pattern. | One predictable mutation funnel makes persistence and rendering impossible to forget — but DOM nodes are not diffed, so list editors re-render their container wholesale. |
 | 4 | **Builder instead of template** | `buildManifestObject()` composes the manifest imperatively and **omits** absent keys rather than emitting `null`/`""` placeholders. | Output matches what Slack's editor produces; filtering happens at a single, testable seam. |
 | 5 | **Derived, not duplicated, scope state** | The `incomingWebhooks` toggle implies the `incoming-webhook` scope. `buildManifestObject()` unions it in at serialization time; the UI keeps the user's explicit list untouched. | Toggling the feature on and off never destroys a hand-typed scope list, and the emitted manifest stays consistent. |
 | 6 | **Validation is advisory** | Field errors render on `blur`; serialization proceeds regardless. | Users iterating on a half-finished manifest still get usable output; invalid entries are filtered at generation time instead of throwing. |
-| 7 | **Defensive deserialization** | `mergeWithDefaults()` type-checks every field, and `normalizeCommand()` / `normalizeShortcut()` coerce list entries. | Stale payloads from an older schema load cleanly; the versioned `STORAGE_KEY` gives a hard reset escape hatch when the shape changes. |
+| 7 | **Defensive deserialization** | `mergeWithDefaults()` type-checks every field of a stored snapshot or an imported manifest, and `normalizeCommand()` / `normalizeShortcut()` coerce list entries. | Stale payloads from an older schema load cleanly; the versioned `STORAGE_KEY` gives a hard reset escape hatch when the shape changes. |
 | 8 | **Layered graceful degradation** | Three independent fallbacks: JSON output when `js-yaml` is missing, `execCommand` copy when the Clipboard API is unavailable, silent no-op when `localStorage` throws. | The tool remains functional in private windows, non-secure contexts, and air-gapped mirrors (with vendored assets). |
-| 9 | **Escape-on-insert** | `escapeHTML()` wraps every interpolated user value; the YAML highlighter escapes before injecting markup. | No persisted-XSS vector from imported manifests or typed scope names. |
+| 9 | **No string-built markup** | Repeated rows, pills, and toggles are cloned from `<template>` elements and filled through `textContent` / `.value`; the YAML highlighter returns a `DocumentFragment` of text nodes and `<span>`s. The script never assigns `innerHTML`. | No injection vector from stored snapshots, imported manifests, or typed scope names — and no escaping step for a future edit to forget. |
 | 10 | **Debounce by input class** | Text-like inputs debounce at 80 ms; toggles, selects, checkbox changes, and add/remove actions render synchronously. | Typing stays smooth on long documents without introducing perceptible lag on discrete actions. |
+| 11 | **Declarative field tables** | `TEXT_FIELDS`, `TAG_FIELDS`, and `REPEATERS` describe every bound control once (state path, element, validation rule); rendering, event wiring, and validation iterate over those tables, with event delegation for the dynamic rows. | Adding a field is one table entry plus its markup, and listeners are attached once at startup instead of on every re-render. |
 
 ### Manifest Generation Pipeline
 
@@ -225,7 +214,7 @@ flowchart LR
         A1["Form fields<br/>basic info & toggles"]
         A2["Tag inputs<br/>scopes & events"]
         A3["Repeaters<br/>commands & shortcuts"]
-        A4["Import modal<br/>jsyaml.load()"]
+        A4["Import dialog<br/>jsyaml.load()"]
     end
 
     subgraph CORE["State core"]
@@ -249,16 +238,16 @@ flowchart LR
     A1 --> B1
     A2 --> B1
     A3 --> B1
-    A4 --> B2
+    A4 -->|"mergeWithDefaults()"| B2
     B1 --> B2
     B1 -->|"try / catch"| B3
     B2 --> C1
     C1 --> C2
     C2 --> D1
     D1 --> D2
-    D2 --> D3
-    D1 -.->|"on dump error"| D4
-    D2 -.->|"js-yaml unavailable"| D4
+    D1 --> D3
+    C2 -.->|"js-yaml unavailable<br/>or dump error"| D4
+    D4 -.-> D3
     B3 -.->|"rehydrate via mergeWithDefaults()"| B2
 ```
 
@@ -277,29 +266,30 @@ sequenceDiagram
     participant LS as localStorage
     participant Y as jsyaml
 
-    U->>S: DOMContentLoaded (or immediate if already loaded)
+    U->>S: Parser reaches the inline script that closes the body
     S->>S: boot()
+    S->>S: attachEventListeners() — one-time, delegated wiring
+    S->>S: checkLibraryAvailable() → library-warning banner
     S->>LS: loadState() → getItem(STORAGE_KEY)
     LS-->>S: JSON string | null
     S->>S: mergeWithDefaults(parsed) — per-field type guards
-    S->>S: attachEventListeners() — one-time wiring
-    S->>S: renderForm() — push state into DOM
-    S->>S: checkLibraryAvailable() → #library-warning banner
-    S->>Y: typeof window.jsyaml.dump === "function"?
+    S->>S: replaceState(loaded) → renderForm() + renderYAML()
+    S->>Y: getYamlLibrary() — are dump() and load() available?
     alt js-yaml present
         Y-->>S: YAML string
-        S->>S: highlightYAML() → #output-code innerHTML
+        S->>S: highlightYAML() → DocumentFragment → output-code
     else js-yaml missing/failed
-        S->>S: JSON.stringify(manifest, null, 2) → #output-code
+        S->>S: JSON.stringify(manifest, null, 2) → output-code
     end
 ```
 
-`boot()` is registered on `DOMContentLoaded` only when `document.readyState === "loading"`; otherwise it runs immediately, which makes the script safe to inject after parse (e.g. from a console or a test harness).
+`boot()` is called directly, as the last statement of the script. The script is the last element of `<body>`, so every element it looks up already exists, and `js-yaml` — a blocking script in `<head>` — has either loaded or failed by then. Nothing waits for `DOMContentLoaded`, so the first paint already shows the restored form and its output.
 
 #### 2. Debounce semantics
 
 - Text-like inputs (`appName`, `shortDescription`, `longDescription`, hex color, request URLs, repeater text fields) call `updateState(..., { debounce: true })`.
-- `renderDebounce` holds a single timer handle; each keystroke clears and re-arms it with an 80 ms delay, so `renderYAML()` executes once per typing pause.
+- `renderTimer` holds a single timer handle; each keystroke clears and re-arms it with an 80 ms delay, so `renderYAML()` executes once per typing pause. `renderYAML()` cancels a pending timer itself, so a synchronous render in the middle of typing is not followed by a redundant one.
+- **Exports are never stale** — *Copy* and *Download* call `flushRender()` first, which runs a render that is still waiting on the debounce, so what leaves the page always matches the form.
 - **Persistence is never debounced** — `saveState()` runs on the leading edge of every mutation, so a tab closed mid-typing still retains the last character.
 - Discrete actions (toggle flips, select changes, pill add/remove, shortcut/command add/remove) call `updateState()` without the flag and therefore render synchronously.
 
@@ -317,14 +307,15 @@ Because derived values are recomputed rather than stored, the manifest can never
 
 #### 4. Rehydration contract
 
-`mergeWithDefaults(persisted)` builds a **fresh** `initState()` and then copies only well-typed values from the persisted payload:
+`mergeWithDefaults(candidate)` builds a **fresh** state in the exact shape of `initState()` and copies only well-typed values from untrusted input — a stored snapshot or the mapping of an imported manifest:
 
-- Strings: copied via `typeof === "string"` guards (invalid types fall back to `""`).
-- Booleans: coerced with `Boolean(...)` for short-circuit keys, `Object.assign` for the `toggles` and `interactivity` maps.
-- Arrays: validated with `Array.isArray()`, then cloned via `.slice()`; list entries are normalised field-by-field with `normalizeCommand()` / `normalizeShortcut()`.
+- Strings: copied via `typeof === "string"` guards (other types fall back to the default).
+- Booleans: `true` only when the value is exactly `true` — a string such as `"false"` never switches a toggle on.
+- String lists: validated with `Array.isArray()`, then reduced to their string entries, trimmed, with blanks and duplicates removed.
+- Object lists: every entry is normalised field-by-field with `normalizeCommand()` / `normalizeShortcut()`; an entry that is not an object (for example `null`) becomes a blank row.
 - Unknown keys: ignored entirely — forward compatibility without schema migrations.
 
-Net effect: a truncated or partially corrupted snapshot degrades to defaults per field, never to a crashed application.
+Net effect: a truncated or partially corrupted snapshot degrades to defaults per field, never to a crashed application, and the rest of the script can rely on the state having exactly one shape.
 
 </details>
 
@@ -336,8 +327,8 @@ Net effect: a truncated or partially corrupted snapshot degrades to defaults per
 
 | Requirement | Minimum | Notes |
 | :--- | :--- | :--- |
-| Web browser | Any modern evergreen browser (Chrome, Edge, Firefox, Safari) with ES2015+ support | Required features: `Object.assign`, template literals, arrow functions, `Array.from`, `Set`, `URL.createObjectURL`, `Blob`, CSS custom properties |
-| Network access | HTTPS egress to `cdn.tailwindcss.com` and `cdnjs.cloudflare.com` | Only for the two runtime assets; see [Offline deployment](#offline--air-gapped-deployment) to remove this requirement |
+| Web browser | Chrome / Edge 86+, Firefox 98+, Safari 15.4+ — any evergreen browser released since March 2022 | Required features: the native `<dialog>` element, `<template>`, `Element.replaceChildren()`, `URL.createObjectURL`, `Blob`, CSS custom properties |
+| Network access | HTTPS egress to `cdnjs.cloudflare.com` | Only for `js-yaml`; see [Offline deployment](#offline--air-gapped-deployment) to remove this requirement |
 | Git | Any version | Only to clone the repository — the app itself needs no tooling |
 | Node.js / Docker / Python | **Not required** | Optional: Node.js ≥ 18 (or Python ≥ 3.8) to serve the file over HTTP, Docker ≥ 24 for container deploys, Node.js/`npm` only if you choose to contribute a build pipeline |
 | `jq` | Optional (`≥ 1.6`) | Used by the optional structural smoke test in [Testing](#testing) |
@@ -423,32 +414,29 @@ TOML
 
 #### Offline / air-gapped deployment
 
-The only external requirements are the two CDN scripts. To make the tool fully self-contained, vendor them and bind locally:
+The only external requirement is `js-yaml`. To make the tool fully self-contained, vendor it and reference the local copy:
 
 ```bash
 mkdir -p vendor
 curl -fsSL -o vendor/js-yaml.min.js \
-  https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js
+  https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.1/js-yaml.min.js
 
-# Optional: a precompiled Tailwind stylesheet instead of the Play CDN.
-# Requires a one-time toolchain; the output is static CSS.
-npx --yes tailwindcss@3 -i ./src/input.css -o vendor/tailwind.css --minify
-
-# Verify the SRI hash you obtained matches the one hard-coded in index.html
+# Verify that the download is the file index.html pins: the output must equal
+# the integrity attribute without its "sha512-" prefix.
 openssl dgst -sha512 -binary vendor/js-yaml.min.js | openssl base64 -A
-# expected (v4.1.0):
-# CSBhVREyzHAjAFfBlIBakjOf8GRTGW/QFt/0/v1/n0/v3vO1jrkXlJqjjQ5fXIoXSU8z1jxiU9MaC7K7XSWfWg==
+# expected (v4.1.1):
+# Ccva9tZjPfyRDMMosATBaEnAKvX+eBbDfHMnr+0LhTa+NMqKRxUAoDGPotb8biwzQ6xnf4IYuDaPiXw10DYaNA==
 ```
 
-Then replace the two `<script src="https://...">` tags in `index.html` with local paths:
+Then point the `<script>` tag in `index.html` at the local path:
 
 ```html
 <!-- Before (CDN) -->
-<link rel="stylesheet" href="/vendor/tailwind.css" />
-<script src="vendor/js-yaml.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.1/js-yaml.min.js"
+        integrity="sha512-…" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 
-<!-- After swapping in vendored assets, drop the integrity/crossorigin
-     attributes — SRI applies to fetched subresources, not same-origin files. -->
+<!-- After (vendored) -->
+<script src="vendor/js-yaml.min.js"></script>
 ```
 
 > [!WARNING]
@@ -474,13 +462,12 @@ There is no compiler in this project — `index.html` **is** the source and **is
 
 | Symptom | Cause | Resolution |
 | :--- | :--- | :--- |
-| Red banner: *"The js-yaml library failed to load…"* | The cdnjs request was blocked (offline network, corporate proxy, ad-blocker, CSP). | The output panel automatically shows JSON instead of YAML; no work is lost. Allow `cdnjs.cloudflare.com` or switch to the vendored setup above. |
+| Red banner: *"The js-yaml library failed to load…"* | The cdnjs request was blocked (offline network, corporate proxy, ad-blocker, CSP), or the file did not match the `integrity` hash. | The output panel automatically shows JSON instead of YAML; no work is lost. Allow `cdnjs.cloudflare.com` or switch to the vendored setup above. |
 | Output panel shows JSON, not YAML | Same root cause as above, or a `jsyaml.dump` exception (message appears in the banner above the panel). | Restore the library, or continue editing — the form state is unaffected and will re-serialize on the next successful render. |
-| "Copy to Clipboard" appears to do nothing | Clipboard permission denied, or the page is served from a non-secure origin. | The code falls back to `execCommand("copy")`; if the browser blocks that too, use **Download manifest.yaml** and copy from the file. The "Copied" badge only appears when the write resolves. |
+| "Copy to Clipboard" reports "Copy failed" | Clipboard permission denied, or the page is served from a non-secure origin. | The code falls back to `execCommand("copy")`; if the browser blocks that too, the badge reads "Copy failed" — use **Download manifest.yaml** and copy from the file. |
 | Inputs are empty after a reload | `localStorage` is unavailable (private/incognito window, storage disabled, or quota exceeded). | Persistence failures are swallowed by design. Use **Download manifest.yaml** as your durable artifact, or run outside private mode. |
-| Text inputs look unstyled | Tailwind's Play CDN was blocked while custom CSS loaded. | Layout degrades only partially (custom component CSS still applies); allow `cdn.tailwindcss.com` or vendor a precompiled stylesheet. |
 | Old fields appear in the form after an upgrade | A snapshot under an older `STORAGE_KEY` schema was loaded and merged field-by-field. | Click **Reset to Defaults** (confirmation required) to clear storage and rebuild the baseline. |
-| "Import" reports *"The document is not a valid Slack manifest object."* | `jsyaml.load()` returned `null` or a non-object (e.g. a bare scalar or a list). | Paste the full manifest document, starting at `_metadata:` or `display_information:`. |
+| "Import" reports *"The document is not a valid Slack manifest object."* | `jsyaml.load()` returned something other than a mapping (`null`, a bare scalar, or a top-level list). | Paste the full manifest document, starting at `_metadata:` or `display_information:`. |
 
 </details>
 
@@ -550,15 +537,15 @@ grep -c 'id="output-code"' index.html            # expect: 1
 grep -c 'id="import-modal"' index.html           # expect: 1
 grep -o 'STORAGE_KEY.*' index.html               # expect: 4 hits — first is the v1 key literal
 
-# Every getElementById(...) target must exist as an id="..." in the markup.
+# Every byId("...") lookup must have a matching id="..." in the markup.
 python3 - <<'PY'
 import re, sys
 html = open("index.html", encoding="utf-8").read()
 declared = set(re.findall(r'id="([^"]+)"', html))
-referenced = set(re.findall(r'getElementById\("([^"]+)"\)', html))
+referenced = set(re.findall(r'byId\("([^"]+)"\)', html))
 missing = sorted(referenced - declared)
 print("referenced ids:", len(referenced), "| undeclared:", missing)
-sys.exit(1 if missing else 0)
+sys.exit(1 if missing or not referenced else 0)
 PY
 
 # ── 4. JavaScript syntax check (extract the inline <script> and parse it) ─────
@@ -570,39 +557,21 @@ print(max(body, key=len))
 PY
 node --check /tmp/app.js && echo "inline script: syntax OK"
 
-# ── 5. XSS audit — classify every ${...} interpolation in HTML templates ──────
-# Every interpolation must either be escapeHTML(...)-wrapped, or reference only
-# structural values (numeric indices, frozen TOGGLE_DEFS keys, booleans).
+# ── 5. XSS audit — the script must never build markup from a string ───────────
+# User data reaches the DOM only through textContent, .value and cloned
+# <template> content, so none of the string-to-markup sinks may appear.
 python3 - <<'PY'
 import re, sys
 
-SRC = open("index.html", encoding="utf-8").read()
-ALLOWED = {"idx", "def.key", "state.toggles[def.key]", "state.interactivity.enabled"}
-STR_LIT = re.compile(r'"(?:[^"\\]|\\.)*"')
-PATH_RE = re.compile(r"[A-Za-z_$][\w$]*(?:\.[\w$]+|\[[^\]]+\])*")
-
-escaped, structural, review = [], [], []
-for lineno, line in enumerate(SRC.splitlines(), 1):
-    for expr in re.findall(r"\$\{([^{}]*)\}", line):
-        e = expr.strip()
-        if e.startswith("escapeHTML("):
-            escaped.append((lineno, e))
-            continue
-        bare = STR_LIT.sub('""', e)                  # drop string literals, keep identifiers
-        paths = set(PATH_RE.findall(bare)) - {"true", "false", "null"}
-        if paths and paths <= ALLOWED:
-            structural.append((lineno, e))
-        else:
-            review.append((lineno, e, sorted(paths)))
-
-print(f"escaped user data : {len(escaped)}")
-print(f"structural (safe) : {len(structural)}")
-for lineno, e, paths in review:
-    print(f"REVIEW line {lineno}: ${{{e}}} -> {paths}")
-print("interpolation audit:", "OK" if not review else f"{len(review)} site(s) need review")
-sys.exit(1 if review else 0)
+SINKS = re.compile(r"innerHTML|outerHTML|insertAdjacentHTML|document\.write|\beval\(|new Function")
+hits = [(n, line.strip()) for n, line in enumerate(open("index.html", encoding="utf-8"), 1)
+        if SINKS.search(line)]
+for n, line in hits:
+    print(f"REVIEW line {n}: {line}")
+print("markup-sink audit:", "OK" if not hits else f"{len(hits)} site(s) need review")
+sys.exit(1 if hits else 0)
 PY
-# Current baseline: 4 escaped interpolations, 18 structural, 0 needing review.
+# Current baseline: 0 sinks.
 
 # ── 6. Lint the inline script (ESLint, no config file required) ───────────────
 npx --yes eslint@8 --no-eslintrc \
@@ -611,7 +580,7 @@ npx --yes eslint@8 --no-eslintrc \
 
 # ── 7. HTML validation (optional; downloads its tooling on demand) ────────────
 # The document uses XHTML-style self-closing void elements (<meta … />, <input … />),
-# so html-validate's default "void-style: omit" rule reports 11 findings. Pin the
+# which html-validate's default "void-style: omit" rule flags one by one. Pin the
 # intended style once in a config file and the check runs clean:
 cat > .htmlvalidate.json <<'JSON'
 {
@@ -656,6 +625,13 @@ The following behaviours are the ones most likely to regress during edits. Walk 
 | 13 | Debounce behaviour | Hold a key down in *App Name* | Output updates in one repaint per pause; no visible lag or dropped keystrokes |
 | 14 | Degraded YAML engine | Block `cdnjs.cloudflare.com` and reload | Warning banner renders; panel shows pretty-printed JSON; form remains fully usable |
 | 15 | Reset semantics | Click *Reset to Defaults* → confirm | `localStorage` key removed; form back to baseline (default scopes `commands`, `chat:write`) |
+| 16 | Stale errors | Trigger an inline error, then import a manifest or reset | Every inline error disappears together with the state it referred to |
+| 17 | Import dialog dismissal | Open *Import YAML*, press `Tab` a few times, then `Esc`; open it again and click the dimmed backdrop; open it again, select text in the textarea and release the mouse over the backdrop | Focus starts in the textarea and never reaches the page behind the dialog; `Esc` and the backdrop click close it and return focus to *Import YAML*; the drag does not close it |
+| 18 | Rejected import shapes | Import `- a` (a top-level list), then a manifest whose `slash_commands` contains an empty item | The list is refused with "The document is not a valid Slack manifest object." and the form is untouched; the second document imports, showing the empty item as a blank row that is left out of the output |
+| 19 | Block-scalar highlighting | Type a multi-line *Long Description* containing `key: value` and `# text` | The whole block is string-coloured; nothing inside it is coloured as a key, and no part of any value is greyed out as a comment |
+| 20 | Honest copy badge | In the console run `Object.defineProperty(navigator, "clipboard", { value: undefined }); document.execCommand = () => false;` then click *Copy to Clipboard* | A red "Copy failed" badge, because neither copy path succeeded; after a reload the green "Copied" badge shows again for 1.5 s |
+| 21 | Blank required values | Add a slash command and type only spaces into its *Description*; do the same for a shortcut's *Name* | Both rows stay in the form, are flagged "This field is required." on blur, and are left out of the output |
+| 22 | Content-Security-Policy | Open DevTools → Console, use every control once (import, copy, download included) | No CSP violation is reported; `fetch("https://example.com")` typed into the console is refused |
 
 ---
 
@@ -668,7 +644,7 @@ The following behaviours are the ones most likely to regress during edits. Walk 
 | **Direct file** | Individual use, reviewers, offline drafting | Open `index.html` from disk | Zero infrastructure; clipboard falls back to `execCommand` |
 | **Static hosting** | Teams, shared internal tooling | Copy `index.html` + `LICENSE` to GitHub Pages, Netlify, Vercel, Cloudflare Pages, S3 + CloudFront, or any nginx/Apache docroot | No build command, no output directory, no server runtime |
 | **Container** | Self-hosted/internal platform rollouts | nginx:alpine image serving a two-file document root | See [Containerization](#containerization-docker-compose--nginx) |
-| **Vendored/air-gapped** | Restricted networks | Vendor Tailwind CSS + `js-yaml` locally | Removes all egress requirements |
+| **Vendored/air-gapped** | Restricted networks | Vendor `js-yaml` locally | Removes all egress requirements |
 
 Because the app is pure static content, "deployment" is a copy operation. The only operational concerns are **cache invalidation** (the HTML changes on every release) and, if you use the CDN build, **CDN availability**.
 
@@ -678,11 +654,11 @@ There is no build command to run. Two optional post-processing steps are worth w
 
 ```bash
 # Produce a self-contained offline bundle
-mkdir -p dist vendor
+mkdir -p dist/vendor
 cp LICENSE index.html dist/
 curl -fsSL -o dist/vendor/js-yaml.min.js \
-  https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js
-sed -i 's#https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js#vendor/js-yaml.min.js#' dist/index.html
+  https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.1/js-yaml.min.js
+sed -i 's#https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.1/js-yaml.min.js#vendor/js-yaml.min.js#' dist/index.html
 
 # Optional: minify and emit a checksum for the release artifacts
 npx --yes html-minifier-terser --collapse-whitespace --remove-comments \
@@ -708,8 +684,8 @@ WORKDIR /src
 COPY index.html ./
 RUN mkdir -p vendor \
  && curl -fsSL -o vendor/js-yaml.min.js \
-      https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js \
- && sed -i 's#https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js#vendor/js-yaml.min.js#' index.html
+      https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.1/js-yaml.min.js \
+ && sed -i 's#https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.1/js-yaml.min.js#vendor/js-yaml.min.js#' index.html
 
 # ── Runtime stage: static nginx ───────────────────────────────────────────────
 FROM nginx:1.27-alpine
@@ -859,39 +835,29 @@ jobs:
           PY
           python3 /tmp/tagcheck.py
 
-      - name: XSS interpolation audit
+      - name: Markup-sink audit
         run: |
-          cat > /tmp/interp.py <<'PY'
+          python3 - <<'PY'
           import re, sys
-          SRC = open("index.html", encoding="utf-8").read()
-          ALLOWED = {"idx", "def.key", "state.toggles[def.key]", "state.interactivity.enabled"}
-          STR_LIT = re.compile(r'"(?:[^"\\]|\\.)*"')
-          PATH_RE = re.compile(r"[A-Za-z_$][\w$]*(?:\.[\w$]+|\[[^\]]+\])*")
-          review = 0
-          for lineno, line in enumerate(SRC.splitlines(), 1):
-              for expr in re.findall(r"\$\{([^{}]*)\}", line):
-                  e = expr.strip()
-                  if e.startswith("escapeHTML("):
-                      continue
-                  paths = set(PATH_RE.findall(STR_LIT.sub('""', e))) - {"true", "false", "null"}
-                  if not (paths and paths <= ALLOWED):
-                      print(f"REVIEW line {lineno}: ${{{e}}} -> {sorted(paths)}")
-                      review += 1
-          print("interpolation audit:", "OK" if not review else f"{review} to review")
-          sys.exit(1 if review else 0)
+          SINKS = re.compile(r"innerHTML|outerHTML|insertAdjacentHTML|document\.write|\beval\(|new Function")
+          hits = [(n, line.strip()) for n, line in enumerate(open("index.html", encoding="utf-8"), 1)
+                  if SINKS.search(line)]
+          for n, line in hits:
+              print(f"REVIEW line {n}: {line}")
+          print("markup-sink audit:", "OK" if not hits else f"{len(hits)} to review")
+          sys.exit(1 if hits else 0)
           PY
-          python3 /tmp/interp.py
 
-      - name: Every getElementById target exists
+      - name: Every byId target exists
         run: |
           python3 - <<'PY'
           import re, sys
           html = open("index.html", encoding="utf-8").read()
           declared = set(re.findall(r'id="([^"]+)"', html))
-          referenced = set(re.findall(r'getElementById\("([^"]+)"\)', html))
+          referenced = set(re.findall(r'byId\("([^"]+)"\)', html))
           missing = sorted(referenced - declared)
           print("undeclared ids:", missing)
-          sys.exit(1 if missing else 0)
+          sys.exit(1 if missing or not referenced else 0)
           PY
 
       - name: Inline script syntax
@@ -922,8 +888,8 @@ jobs:
           mkdir -p dist/vendor
           cp index.html LICENSE dist/
           curl -fsSL -o dist/vendor/js-yaml.min.js \
-            https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js
-          sed -i 's#https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js#vendor/js-yaml.min.js#' dist/index.html
+            https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.1/js-yaml.min.js
+          sed -i 's#https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.1/js-yaml.min.js#vendor/js-yaml.min.js#' dist/index.html
           sha256sum dist/index.html > dist/index.html.sha256
 
       - uses: actions/upload-artifact@v4
@@ -938,7 +904,7 @@ jobs:
 git tag -a v1.0.0 -m "Slack App Manifest Generator v1.0.0"
 git push origin v1.0.0
 gh release create v1.0.0 dist/index.html dist/index.html.sha256 \
-  --title "v1.0.0" --notes "Manifest schema major 1 / minor 1; js-yaml 4.1.0 pinned via SRI."
+  --title "v1.0.0" --notes "Manifest schema major 1 / minor 1; js-yaml 4.1.1 pinned via SRI."
 ```
 
 </details>
@@ -976,8 +942,8 @@ _metadata:
 display_information:
   name: Incident Log Relay
   description: Streams structured incident logs into Slack channels.
-  long_description: Bridges your logging pipeline to Slack with per-severity routing.
   background_color: "#2C2D30"
+  long_description: Bridges your logging pipeline to Slack with per-severity routing.
 features:
   app_home:
     messages_tab_enabled: true
@@ -1064,7 +1030,7 @@ The generator targets manifest schema **`major_version: 1`, `minor_version: 1`**
 2. Paste the complete manifest document.
 3. Click **Import**. On success the modal closes and the form repopulates; on failure the modal stays open with an inline error.
 
-**What the importer reads** (implemented in `importYAML()`):
+**What the importer reads** (`importYAML()` maps the manifest onto the state shape, `mergeWithDefaults()` type-checks the result):
 
 | YAML path | Target state | Coercion applied |
 | :--- | :--- | :--- |
@@ -1072,20 +1038,20 @@ The generator targets manifest schema **`major_version: 1`, `minor_version: 1`**
 | `display_information.description` | `shortDescription` | Truncated to 140 characters |
 | `display_information.long_description` | `longDescription` | `typeof === "string"` guard |
 | `display_information.background_color` | `backgroundColor` | Only accepted if it passes `HEX_COLOR_RE` |
-| `features.app_home.messages_tab_enabled` | toggle | `Boolean()` |
-| `features.app_home.messages_tab_read_only_enabled` | toggle | `Boolean()` |
-| `features.incoming_webhooks` | `incomingWebhooks` toggle | `Boolean()` |
-| `features.slash_commands[]` | `slashCommands[]` | Per-field string guards; `usage_hint` → `usageHint`, `should_escape` → `shouldEscape` |
-| `features.shortcuts[]` | `shortcuts[]` | `callback_id` → `callbackId`; unknown `type` values normalise to `global` |
+| `features.app_home.messages_tab_enabled` | toggle | On only for a literal `true` |
+| `features.app_home.messages_tab_read_only_enabled` | toggle | On only for a literal `true` |
+| `features.incoming_webhooks` | `incomingWebhooks` toggle | On for a literal `true`, or when the bot scopes list `incoming-webhook` |
+| `features.slash_commands[]` | `slashCommands[]` | Non-object items become blank rows; per-field string guards; `usage_hint` → `usageHint`, `should_escape` → `shouldEscape` (literal `true` only) |
+| `features.shortcuts[]` | `shortcuts[]` | Non-object items become blank rows; `callback_id` → `callbackId`; unknown `type` values normalise to `global` |
 | `oauth_config.scopes.bot[]` | `botScopes` | Strings only; `incoming-webhook` is **stripped and converted into the webhook toggle** |
 | `oauth_config.scopes.user[]` | `userScopes` | Strings only |
 | `settings.event_subscriptions.request_url` | `eventSubscriptions.requestUrl` | String guard |
 | `settings.event_subscriptions.bot_events[]` / `user_events[]` | matching arrays | Non-strings filtered out |
-| `settings.interactivity.is_enabled` | `interactivity.enabled` | Truthy check; sub-URLs read only when enabled |
+| `settings.interactivity.is_enabled` | `interactivity.enabled` | Literal `true` only; sub-URLs read only when enabled |
 | `settings.interactivity.request_url`, `message_menu_options_url` | matching fields | String guards |
-| `settings.socket_mode_enabled` | `socketMode` toggle | `Boolean()` |
-| `settings.org_deploy_enabled` | `orgDeploy` toggle | `Boolean()` |
-| `settings.token_rotation_enabled` | `tokenRotation` toggle | `Boolean()` |
+| `settings.socket_mode_enabled` | `socketMode` toggle | On only for a literal `true` |
+| `settings.org_deploy_enabled` | `orgDeploy` toggle | On only for a literal `true` |
+| `settings.token_rotation_enabled` | `tokenRotation` toggle | On only for a literal `true` |
 
 **Error contract**
 
@@ -1094,11 +1060,12 @@ The generator targets manifest schema **`major_version: 1`, `minor_version: 1`**
 | Empty textarea | *"Please paste a YAML document."* |
 | `jsyaml.load()` throws (bad indentation, tabs, unclosed quotes) | *"Could not parse YAML: " + error.message* |
 | Library unavailable | *"Could not parse YAML: js-yaml library is unavailable."* |
-| Parsed value is `null` or not an object | *"The document is not a valid Slack manifest object."* |
+| Parsed value is not a mapping (`null`, a scalar, or a top-level list) | *"The document is not a valid Slack manifest object."* |
 
 **Semantics to be aware of**
 
-- Import **replaces** the entire state; it does not merge with the current form.
+- Import **replaces** the entire state; it does not merge with the current form. Keys the document does not contain fall back to the defaults of a fresh form — including the pre-seeded bot scopes when `oauth_config.scopes.bot` is absent.
+- Inline validation errors are cleared along with the state they referred to.
 - The imported state is written to `localStorage` immediately, so a reload preserves it.
 - Unmapped keys are dropped from the form — but they only disappear from the *generated* output if you re-export without re-adding them; keep the original document if you rely on keys this tool does not model.
 - `incoming-webhook` is deliberately relocated from the scope list into the toggle, so re-exporting produces the identical manifest while keeping the UI's single-source-of-truth rule intact.
@@ -1129,22 +1096,22 @@ The output formatter is intentionally isolated so it can be swapped without touc
 
 | Hook | Location | Responsibility |
 | :--- | :--- | :--- |
-| `buildManifestObject()` | MANIFEST BUILDER | Produces the plain object graph to emit |
-| `renderYAML()` | YAML RENDER | Serializes and writes into `#output-code`, with JSON fallback |
-| `highlightYAML(yamlString)` | YAML RENDER | Converts a YAML string into highlighted, escaped HTML |
+| `buildManifestObject()` | Manifest | Produces the plain object graph to emit |
+| `renderYAML()` | Output | Serializes, keeps the result in `outputText` (the string that Copy and Download export) and writes it into `#output-code`, with JSON fallback |
+| `highlightYAML(yamlText)` | Output | Converts YAML text into a `DocumentFragment` of text nodes and coloured `<span>`s |
 
 <details>
 <summary><strong>Recipe A — change the dump options (quoting, line width, key order)</strong></summary>
 
-The emitter is configured inline in `renderYAML()`:
+The emitter options live in one frozen constant, which `renderYAML()` passes to `jsyaml.dump()`:
 
 ```js
-// index.html — renderYAML()
-yamlString = window.jsyaml.dump(manifest, {
+// index.html — Configuration
+const YAML_DUMP_OPTIONS = Object.freeze({
   noRefs: true,        // inline aliases instead of emitting &anchors/*refs
   lineWidth: 120,      // wrap threshold for long scalar values
   quotingType: '"',    // prefer double quotes when quoting is required
-  forceQuotes: false   // quote only when the value needs it
+  forceQuotes: false,  // quote only when the value needs it
 });
 ```
 
@@ -1173,24 +1140,21 @@ Because `jsyaml.load()` accepts JSON (JSON is a YAML 1.2 subset), a JSON variant
 
 ```js
 // Replace the body of renderYAML() with an equivalent JSON writer.
-// Keep the banner logic so failures stay visible to the user.
 function renderYAML() {
-  const manifest = buildManifestObject();
-  const errEl = outputErrorEl();
-  errEl.classList.add("hidden");
-  errEl.textContent = "";
+  clearTimeout(renderTimer);
 
-  outputCodeEl().innerHTML = highlightYAML(JSON.stringify(manifest, null, 2));
-  outputCodeEl().dataset.format = "json";
+  outputText = JSON.stringify(buildManifestObject(), null, 2);   // what Copy and Download export
+  dom.outputCode.textContent = outputText;
+  dom.outputError.hidden = true;
 }
 ```
 
-Download names and MIME types travel with the download hook, so update `downloadYAML()` too:
+The download name and MIME type are constants, so update them too:
 
 ```js
-// index.html — downloadYAML()
-const blob = new Blob([text], { type: "application/json;charset=utf-8" });
-a.download = "manifest.json";   // was: manifest.yaml
+// index.html — Configuration
+const DOWNLOAD_NAME = "manifest.json";                       // was: "manifest.yaml"
+const DOWNLOAD_TYPE = "application/json;charset=utf-8";      // was: "application/x-yaml;charset=utf-8"
 ```
 
 </details>
@@ -1207,8 +1171,7 @@ The builder's plain object is the ideal input for any downstream projection:
  * scopes your deployed service actually requests at runtime.
  */
 function projectScopeDrift(manifest, declaredAtRuntime) {
-  // Optional chaining (?.) is ES2020 — destructure defensively instead so this
-  // snippet stays within the application's ES2015 baseline.
+  // Either level may be missing: oauth_config is {} when no scopes are set.
   const oauth    = manifest.oauth_config || {};
   const scopes   = oauth.scopes || {};
   const requested = new Set([...(scopes.bot || []), ...(scopes.user || [])]);
@@ -1242,18 +1205,18 @@ if (drift.missing.length || drift.unexpected.length) {
 
 | Edge case | Behaviour | Where it is handled |
 | :--- | :--- | :--- |
-| **Empty app name** | `display_information.name` is emitted as `""`; the field is flagged red on blur only | `buildManifestObject()` + `validateField("appName")` |
-| **Invalid hex colour** | Falls back to `#2C2D30` (the picker's normalised value) rather than emitting invalid YAML | `HEX_COLOR_RE` ternary in `display_information.background_color` |
-| **Missing description on a slash command** | Row stays visible; the command is filtered out of `features.slash_commands` | `filter(c => c.command && c.description)` |
-| **Slash command without `/`** | Syntax warning on blur; the row remains and is still emitted | `onCommandFieldBlur` |
-| **Callback ID with illegal characters** | Warning on blur; emission is unaffected | `onShortcutFieldBlur` + `CALLBACK_ID_RE` |
-| **Duplicate pills** | Silently ignored; the input clears so the user can keep typing | `addTag()` `indexOf` guard |
-| **Non-HTTPS or malformed URL** | The corresponding key is omitted entirely; the block may still emit for other sub-keys | `HTTPS_URL_RE` guards |
+| **Empty app name** | `display_information.name` is emitted as `""`; the field is flagged red on blur only | `buildManifestObject()` + the `checkRequired` rule in `TEXT_FIELDS` |
+| **Invalid hex colour** | Falls back to `#2C2D30` (the picker's normalised value) rather than emitting invalid YAML | `effectiveBackgroundColor()` |
+| **Missing description on a slash command** (empty or whitespace only) | Row stays visible; the command is filtered out of `features.slash_commands`. Shortcuts behave the same for *Name*, *Callback ID* and *Description* | `filter((item) => item.command.trim() && item.description.trim())` in `buildManifestObject()` |
+| **Slash command without `/`** | Syntax warning on blur; the row remains and is still emitted | `checkSlashCommand` rule in `REPEATERS` |
+| **Callback ID with illegal characters** | Warning on blur; emission is unaffected | `checkCallbackId` rule + `CALLBACK_ID_RE` |
+| **Duplicate pills** | Silently ignored; the input clears so the user can keep typing | `addTag()` `includes` guard |
+| **Non-HTTPS or malformed URL** | The corresponding key is omitted entirely and the field is flagged on blur; the block may still emit for other sub-keys. A stray leading or trailing space, a missing host (`https://`) or anything `new URL()` rejects counts as malformed in both places | `isHttpsUrl()` in `buildManifestObject()` and `checkHttpsUrl` |
 | **Interactivity enabled with no URL** | `settings.interactivity` still emits `{ is_enabled: true }` without a `request_url` | `buildManifestObject()` |
 | **`long_description` whitespace only** | `trim()` yields length 0 → key omitted | `buildManifestObject()` |
-| **`incoming-webhook` typed manually *and* toggle on** | `Set` deduplication emits the scope exactly once | `Array.from(new Set([...]))` |
+| **`incoming-webhook` typed manually *and* toggle on** | `Set` deduplication emits the scope exactly once | `Array.from(new Set(…))` in `buildManifestObject()` |
 | **`incoming-webhook` in an imported manifest** | Converted into the webhook toggle and removed from the pill list | `importYAML()` |
-| **`localStorage` quota exceeded / disabled** | Persistence silently no-ops; the app remains fully functional for the session | `try/catch` in `saveState()` |
+| **`localStorage` quota exceeded / disabled** | Persistence silently no-ops; the app remains fully functional for the session, and **Reset to Defaults** still resets the form | `try/catch` in `saveState()`, `loadState()`, and `clearSavedState()` |
 | **Corrupt persisted JSON** | Snapshot ignored; fresh defaults load, previous work in the DOM is unaffected until reload | `try/catch` in `loadState()` |
 | **Stale snapshot missing new fields** | Per-field type guards fill in defaults | `mergeWithDefaults()` |
 | **`js-yaml` unavailable at boot** | Red banner + JSON output in the preview panel | `checkLibraryAvailable()` + `renderYAML()` fallback |
@@ -1261,8 +1224,13 @@ if (drift.missing.length || drift.unexpected.length) {
 | **Clipboard API unavailable/denied** | Hidden textarea + `execCommand("copy")` fallback | `fallbackCopy()` |
 | **Download revoked object URL** | Revoked after 1 s — long enough for the click to register | `downloadYAML()` `setTimeout` |
 | **Reset with unsaved work** | Confirmation dialog gates the destructive path | `window.confirm(STRINGS.RESET_CONFIRM)` |
-| **Blocked `cdn.tailwindcss.com`** | Custom component CSS still applies; layout utilities degrade | Graceful by omission (no JS dependency on Tailwind) |
-| **XSS attempt via scope name or imported manifest** | Rendered as inert text — every interpolation passes through `escapeHTML()` | `escapeHTML()` |
+| **List with non-object entries** (`slash_commands: [null]` in a manifest or a stored snapshot) | Each stray entry becomes a blank row, which is not emitted; everything else loads | `asObjectList()` in `importYAML()` / `mergeWithDefaults()` |
+| **Padded, blank or repeated list entries** (`bot: [' chat:write ', chat:write, '']`) | Entries are trimmed; blanks and duplicates are removed | `asStringList()` in `importYAML()` / `mergeWithDefaults()` |
+| **Every copy path refused** | A red "Copy failed" badge instead of "Copied" | `showCopyStatus()` |
+| **Top-level list or scalar pasted into the import dialog** | Refused with *"The document is not a valid Slack manifest object."*; the form is untouched | `parseManifest()` |
+| **Non-boolean flag in a manifest or snapshot** (`socket_mode_enabled: "false"`) | Treated as off — only a literal `true` enables a toggle | `mergeWithDefaults()` |
+| **Stale inline errors after reset or import** | Cleared together with the state they referred to | `renderForm()` → `setFieldError()` |
+| **XSS attempt via scope name, stored snapshot, or imported manifest** | Rendered as inert text — values reach the DOM only through `textContent` / `.value` | `<template>` cloning; the script contains no `innerHTML` |
 
 **Known limitations (by design)**
 
@@ -1285,7 +1253,7 @@ if (drift.missing.length || drift.unexpected.length) {
 
 Every function lives at the top level of an inline `<script>` with no module wrapper, so the whole application surface is reachable from the browser console. That makes the tool scriptable without a bundler or a package export — **no build step, no `import`, no bundler runtime required**.
 
-Precision note: `function` declarations (`buildManifestObject`, `updateState`, `renderYAML`, `renderTags`, `renderToggles`, …) become properties of `window`, while `const`/`let` bindings (`state`, `STRINGS`, `TOGGLE_DEFS`, `STORAGE_KEY`, the regexes) are global *lexical* bindings — visible to code you type or evaluate in the console, but **not** as `window.state`. Read and write them through the functions above rather than reaching for the raw binding.
+Precision note: `function` declarations (`buildManifestObject`, `updateState`, `renderYAML`, `renderTags`, `renderToggles`, …) become properties of `window`, while `const`/`let` bindings (`state`, `STRINGS`, `TOGGLE_DEFS`, `STORAGE_KEY`, the regexes, and arrow-function helpers such as `byId` or `isHexColor`) are global *lexical* bindings — visible to code you type or evaluate in the console, but **not** as `window.state`. Read and write them through the functions above rather than reaching for the raw binding.
 
 **1. Read the current manifest as a JS object:**
 
@@ -1297,23 +1265,26 @@ buildManifestObject();
 **2. Generate YAML headlessly:**
 
 ```js
-jsyaml.dump(buildManifestObject(), { noRefs: true, lineWidth: 120, quotingType: '"' });
+jsyaml.dump(buildManifestObject(), YAML_DUMP_OPTIONS);
 ```
 
-**3. Set a field programmatically (persists + re-renders):**
+**3. Set a field programmatically (persists + re-renders the output):**
 
 ```js
 updateState("appName", "Log Delivery Bot");                       // renders synchronously
 updateState("eventSubscriptions.requestUrl",
             "https://logs.example.com/slack/events", { debounce: true });
+renderForm();                                                     // push the new state into the form controls
 ```
+
+`updateState()` only accepts paths that already exist in the state tree; a mistyped path throws `Unknown state path: …` instead of silently adding a key.
 
 **4. Batch-load a complete configuration (leaf paths only):**
 
 ```js
 // Nested values must be addressed by leaf path — `updateState` walks the dotted
-// segments and assigns the final one, so a whole-object write to "toggles"
-// would replace the map without re-rendering the toggle switches.
+// segments and assigns the final one. List values are replaced, never mutated
+// in place, so pass a fresh array.
 const cfg = {
   "appName": "Log Delivery Bot",
   "shortDescription": "Routes structured logs into Slack channels.",
@@ -1325,9 +1296,9 @@ const cfg = {
 
 Object.keys(cfg).forEach((path) => updateState(path, cfg[path]));
 
-// Array writes are by reference — the renderers read the live array, so mutate
-// first and then call updateState, or reassign a fresh array as above.
-renderToggles();   // re-sync toggle switch visuals after path-based writes
+// updateState() refreshes the output panel only. Re-sync the form — inputs,
+// counters, toggle switches, pills, and repeater rows — in one call.
+renderForm();
 ```
 
 **5. Assert against a fixture in a browser-driven test:**
@@ -1365,11 +1336,11 @@ The generator is deliberately **configuration-light**: because it produces confi
 | :--- | :--- |
 | Storage key | `slack-manifest-generator-state-v1` |
 | Format | JSON-serialized object matching the internal `state` shape |
-| Write policy | On every `updateState()` call (leading edge — never debounced) |
+| Write policy | On every `updateState()` call (leading edge — never debounced) and after an import |
 | Read policy | Once at boot, in `loadState()` |
-| Failure policy | `try`/`catch` around both `getItem` and `setItem`; failures are silently ignored |
+| Failure policy | `try`/`catch` around `getItem`, `setItem`, and `removeItem`; failures are silently ignored |
 | Versioning | The `-v1` suffix is the schema version; a breaking shape change should bump it, which invalidates old snapshots by construction |
-| Reset | **Reset to Defaults** (after confirmation) calls `localStorage.removeItem(STORAGE_KEY)` |
+| Reset | **Reset to Defaults** (after confirmation) calls `localStorage.removeItem(STORAGE_KEY)` through `clearSavedState()` |
 
 ### Compile-Time Constants
 
@@ -1378,19 +1349,22 @@ The generator is deliberately **configuration-light**: because it produces confi
 
 | Constant | Default | Location | Purpose / effect of changing it |
 | :--- | :--- | :--- | :--- |
-| `STORAGE_KEY` | `"slack-manifest-generator-state-v1"` | CONSTANTS | `localStorage` namespace; bump the suffix to invalidate older snapshots |
-| `DEBOUNCE_MS` | `80` | CONSTANTS | Render debounce for text inputs. Lower = snappier, higher CPU; higher = smoother typing, laggier preview |
-| `DEFAULT_BG_COLOR` | `"#2C2D30"` | CONSTANTS | Baseline background colour and invalid-hex fallback |
-| `DEFAULT_BOT_SCOPES` | `["commands", "chat:write"]` | CONSTANTS | Pre-seeded bot scopes on first load and after reset |
-| `HEX_COLOR_RE` | `/^#([0-9a-fA-F]{6})$/` | CONSTANTS | Accepts exactly `#` + 6 hex digits; **3-digit shorthand is rejected** |
-| `HTTPS_URL_RE` | `/^https:\/\/[^\s]+$/i` | CONSTANTS | HTTPS-only gate for every `request_url` field |
-| `CALLBACK_ID_RE` | `/^[A-Za-z0-9_]+$/` | CONSTANTS | Shortcut `callback_id` charset |
-| `TOGGLE_DEFS` | 6 entries | CONSTANTS | Toggle registry: `key`, `label`, `description`. Add an entry to render a new toggle — remember to also handle its key in `buildManifestObject()` |
-| js-yaml dump options | `noRefs: true`, `lineWidth: 120`, `quotingType: '"'`, `forceQuotes: false` | `renderYAML()` | Output formatting; see [Custom Formatters](#custom-formatters) |
-| App name limit | `35` | Markup (`maxlength` + counter) | Slack's app-name constraint; changing the counter requires editing both the attribute and the `n / limit` label |
-| Short description limit | `140` | Markup (`maxlength` + counter) | Slack's short-description constraint |
+| `STORAGE_KEY` | `"slack-manifest-generator-state-v1"` | Configuration | `localStorage` namespace; bump the suffix to invalidate older snapshots |
+| `DEBOUNCE_MS` | `80` | Configuration | Render debounce for text inputs. Lower = snappier, higher CPU; higher = smoother typing, laggier preview |
+| `COPIED_BADGE_MS` | `1500` | Configuration | How long the copy badge ("Copied" / "Copy failed") stays visible |
+| `DOWNLOAD_NAME` / `DOWNLOAD_TYPE` | `"manifest.yaml"` / `"application/x-yaml;charset=utf-8"` | Configuration | File name and MIME type of the download |
+| `APP_NAME_MAX_LENGTH` | `35` | Configuration | Slack's app-name constraint. One constant drives the `maxlength` attribute, the `n / limit` counter, and the truncation of imported values |
+| `SHORT_DESCRIPTION_MAX_LENGTH` | `140` | Configuration | Slack's short-description constraint; same three uses |
+| `DEFAULT_BG_COLOR` | `"#2C2D30"` | Configuration | Baseline background colour and invalid-hex fallback |
+| `DEFAULT_BOT_SCOPES` | `["commands", "chat:write"]` | Configuration | Pre-seeded bot scopes on first load and after reset |
+| `INCOMING_WEBHOOK_SCOPE` | `"incoming-webhook"` | Configuration | The scope that the *Incoming Webhooks* toggle adds on export and absorbs on import |
+| `HEX_COLOR_RE` | `/^#[0-9a-fA-F]{6}$/` | Configuration | Accepts exactly `#` + 6 hex digits; **3-digit shorthand is rejected** |
+| `isHttpsUrl()` | `new URL(value)` with protocol `https:`, a non-empty host, and no surrounding whitespace | Validation rules | HTTPS-only gate for every `request_url` field, shared by validation and the manifest builder |
+| `CALLBACK_ID_RE` | `/^[A-Za-z0-9_]+$/` | Configuration | Shortcut `callback_id` charset |
+| `YAML_DUMP_OPTIONS` | `noRefs: true`, `lineWidth: 120`, `quotingType: '"'`, `forceQuotes: false` | Configuration | Output formatting; see [Custom Formatters](#custom-formatters) |
+| `STRINGS` | 14 user-facing messages | Configuration | Single frozen table for all copy, including the reset confirmation and every error string |
+| `TOGGLE_DEFS` | 6 entries | Configuration | Toggle registry: `key`, `label`, `description`. Add an entry to render a new toggle — its key must also exist in `initState().toggles`, and `buildManifestObject()` has to emit it |
 | Manifest `_metadata` | `major_version: 1`, `minor_version: 1` | `buildManifestObject()` | Schema target; update only when you intend to target a newer manifest schema |
-| `STRINGS` | 14 user-facing messages | CONSTANTS | Single frozen table for all copy, including the reset confirmation and every error string |
 
 </details>
 
@@ -1407,7 +1381,7 @@ The generator is deliberately **configuration-light**: because it produces confi
    ]);
    ```
 
-2. **Add it to the default state** (`initState()`), so reset and rehydration agree:
+2. **Add it to the default state** (`initState()`), so reset and rehydration agree. `updateState()` rejects paths that are not in the default shape, and `mergeWithDefaults()` picks the new key up from here automatically:
 
    ```js
    toggles: { /* … */ workflowSteps: false },
@@ -1417,7 +1391,7 @@ The generator is deliberately **configuration-light**: because it produces confi
 
    ```js
    // inside buildManifestObject(), features assembly
-   if (state.toggles.workflowSteps) {
+   if (toggles.workflowSteps) {
      features.workflow_steps = [ /* step definitions */ ];
    }
    ```
@@ -1425,8 +1399,8 @@ The generator is deliberately **configuration-light**: because it produces confi
 4. **Map it on import**, so round-trips are lossless:
 
    ```js
-   // inside importYAML()
-   next.toggles.workflowSteps = Boolean(features.workflow_steps);
+   // inside importYAML(), in the `toggles` map of `candidate`
+   workflowSteps: Boolean(features.workflow_steps),
    ```
 
 5. **Extend the regression matrix** and (if you script anything) bump `STORAGE_KEY` to `-v2` so stale snapshots cannot reintroduce the old shape.
@@ -1444,7 +1418,7 @@ The generator is deliberately **configuration-light**: because it produces confi
 | Variable / Directive | Scope | Required | Purpose |
 | :--- | :--- | :--- | :--- |
 | *(none)* | Application runtime | — | The app is fully client-side and has no server process or `.env` contract |
-| `CONTENT_SECURITY_POLICY` / `Content-Security-Policy` header | Web server / CDN | Recommended | Must permit `https://cdn.tailwindcss.com` (script) and `https://cdnjs.cloudflare.com` (script) for the CDN build; with vendored assets, restrict to `'self' 'unsafe-inline'` |
+| `Content-Security-Policy` | Built in (`<meta http-equiv>`), optionally tightened by a header | Shipped | The document already declares `default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'`. A response header can only narrow it further: for the CDN build it must keep `https://cdnjs.cloudflare.com` in `script-src`; with the vendored asset `'self' 'unsafe-inline'` is enough. `frame-ancestors` is honoured only in a header |
 | `Permissions-Policy: clipboard-write=(self)` | Web server / CDN | Optional | Explicitly allows the async Clipboard API; the `execCommand` fallback covers its absence |
 | `X-Content-Type-Options: nosniff` | Web server / CDN | Recommended | Prevents MIME sniffing of the served HTML/YAML assets |
 | `X-Frame-Options` / `frame-ancestors` | Web server / CDN | Recommended | Set to `SAMEORIGIN` unless you intentionally embed the tool in an internal portal |
@@ -1528,18 +1502,19 @@ The generator is deliberately **configuration-light**: because it produces confi
 
 | Field | Type | Coercion on load (`mergeWithDefaults`) | Constraint |
 | :--- | :--- | :--- | :--- |
-| `appName` | `string` | Non-strings → `""` | ≤ 35 chars in the UI; no hard truncation on load |
-| `shortDescription` | `string` | Non-strings → `""` | ≤ 140 chars in the UI |
+| `appName` | `string` | Non-strings → `""` | ≤ 35 chars in the UI and on import; a longer stored value is kept as it is |
+| `shortDescription` | `string` | Non-strings → `""` | ≤ 140 chars in the UI and on import |
 | `longDescription` | `string` | Non-strings → `""` | Omitted from output when blank after `trim()` |
-| `backgroundColor` | `string` | Non-strings → default | Must match `/^#([0-9a-fA-F]{6})$/` to survive round-trips |
-| `toggles.*` | `boolean` | `Object.assign` over defaults; unknown keys ignored | — |
-| `botScopes`, `userScopes` | `string[]` | `Array.isArray` guard, then `.slice()` clone | De-duplicated on emission |
-| `slashCommands[]` | `object[]` | `normalizeCommand()` per entry | `command` should start with `/`; `command` + `description` required for emission |
-| `eventSubscriptions.requestUrl` | `string` | `Object.assign` over defaults | Must match the HTTPS regex to be emitted |
-| `eventSubscriptions.botEvents[]` / `userEvents[]` | `string[]` | Explicit `Array.isArray` guards applied **after** the default merge (defensive against `undefined` sub-objects) | Emitted only when non-empty |
-| `shortcuts[]` | `object[]` | `normalizeShortcut()` per entry; `type` coerced to `global` unless exactly `"message"` | `name` + `callbackId` + `description` required for emission |
-| `interactivity.enabled` | `boolean` | `Object.assign` over defaults | Gates the whole `settings.interactivity` block |
-| `interactivity.requestUrl` / `messageMenuOptionsUrl` | `string` | `Object.assign` over defaults | HTTPS-gated individually |
+| `backgroundColor` | `string` | Non-strings → default | Must match `/^#[0-9a-fA-F]{6}$/` to be emitted; otherwise the default colour is emitted instead |
+| `toggles.*` | `boolean` | `true` only for a literal `true`; unknown keys ignored | — |
+| `botScopes` | `string[]` | Not an array → default scopes; entries trimmed; non-strings, blanks and duplicates dropped | Duplicates are refused on entry |
+| `userScopes` | `string[]` | Not an array → `[]`; entries trimmed; non-strings, blanks and duplicates dropped | Duplicates are refused on entry |
+| `slashCommands[]` | `object[]` | `normalizeCommand()` per entry; a non-object entry becomes a blank row | `command` should start with `/`; non-blank `command` + `description` required for emission |
+| `eventSubscriptions.requestUrl` | `string` | Non-strings → `""` | Must pass `isHttpsUrl()` to be emitted |
+| `eventSubscriptions.botEvents[]` / `userEvents[]` | `string[]` | Not an array → `[]`; entries trimmed; non-strings, blanks and duplicates dropped | Emitted only when non-empty |
+| `shortcuts[]` | `object[]` | `normalizeShortcut()` per entry; a non-object entry becomes a blank row; `type` coerced to `global` unless exactly `"message"` | non-blank `name` + `callbackId` + `description` required for emission |
+| `interactivity.enabled` | `boolean` | `true` only for a literal `true` | Gates the whole `settings.interactivity` block |
+| `interactivity.requestUrl` / `messageMenuOptionsUrl` | `string` | Non-strings → `""` | HTTPS-gated individually |
 | *unknown keys* | — | Dropped | Guarantees forward compatibility without migrations |
 
 > [!TIP]
@@ -1572,7 +1547,7 @@ limitations under the License.
 You are free to use, modify, and distribute this software — including for commercial and closed-source purposes — provided you retain the copyright and attribution notices and include a copy of the license. Apache 2.0 additionally grants an express patent license and requires that modified files carry prominent change notices.
 
 > [!NOTE]
-> **Third-party components.** The runtime assets are distributed under their own licenses: **Tailwind CSS** (MIT) and **js-yaml** (MIT). This repository does not vendor them by default; it references them via CDN, and `js-yaml` 4.1.0 is pinned with a Subresource Integrity hash. Review those licenses independently if you vendor the assets into a redistributed bundle.
+> **Third-party components.** The one runtime asset, **js-yaml**, is distributed under its own license (MIT). This repository does not vendor it by default; it references it via CDN, pinned to version 4.1.1 with a Subresource Integrity hash. Review that license independently if you vendor the asset into a redistributed bundle.
 
 ---
 
